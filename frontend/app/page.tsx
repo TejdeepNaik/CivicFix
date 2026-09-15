@@ -7,94 +7,174 @@ export default function HomePage() {
   const { user } = useAuth();
 
   return (
-    <div className="space-y-16 py-8">
+    <div className="space-y-24 py-6">
       {/* Hero Section */}
-      <section className="text-center space-y-6 max-w-4xl mx-auto py-12">
-        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-800/60 text-emerald-400 text-xs font-semibold">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <span>Real-time Civic Resolution Platform</span>
+      <section className="relative text-center space-y-8 max-w-4xl mx-auto pt-8 pb-12">
+        {/* Glow background accent */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+        <div className="inline-flex items-center space-x-2.5 px-4 py-2 rounded-full bg-teal-950/80 border border-teal-800/60 text-teal-300 text-xs font-semibold shadow-inner">
+          <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+          <span>Modern Municipal SaaS Platform</span>
         </div>
 
-        <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight">
-          Fix Municipal Issues <br />
-          <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-            With Speed & Transparency
+        <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-[1.15]">
+          Report, Track & Resolve <br />
+          <span className="bg-gradient-to-r from-teal-300 via-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+            Civic Issues In Your Community
           </span>
         </h1>
 
-        <p className="text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          Report potholes, streetlights, garbage, and infrastructure complaints in seconds. Track full audit trails, automated department routing, and verified resolution status.
+        <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
+          CivicFix helps you report potholes, broken streetlights, water leaks, and garbage hazards in seconds. Experience complete transparency with automated department routing and verified resolutions.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
           {user ? (
-            <Link
-              href="/dashboard"
-              className="btn-primary text-base px-8 py-3.5 rounded-xl shadow-lg shadow-emerald-500/20"
-            >
-              Go to Your Dashboard →
-            </Link>
+            <>
+              {user.role === "citizen" ? (
+                <Link
+                  href="/complaints/create"
+                  className="btn-civic-primary text-sm px-8 py-4 text-slate-950 rounded-xl"
+                >
+                  <span>+</span> Report an Issue
+                </Link>
+              ) : null}
+              <Link
+                href="/dashboard"
+                className="btn-civic-secondary text-sm px-8 py-4 rounded-xl"
+              >
+                Track My Complaints →
+              </Link>
+            </>
           ) : (
             <>
               <Link
                 href="/register"
-                className="btn-primary text-base px-8 py-3.5 rounded-xl shadow-lg shadow-emerald-500/20"
+                className="btn-civic-primary text-sm px-8 py-4 text-slate-950 rounded-xl"
               >
-                Report a Civic Issue Now
+                Report an Issue
               </Link>
               <Link
                 href="/login"
-                className="btn-secondary text-base px-8 py-3.5 rounded-xl"
+                className="btn-civic-secondary text-sm px-8 py-4 rounded-xl"
               >
-                Sign In to Account
+                Track My Complaints
               </Link>
             </>
           )}
         </div>
       </section>
 
-      {/* Feature Cards Grid */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="glass-card p-6 space-y-3 glass-card-hover">
-          <div className="w-10 h-10 rounded-lg bg-emerald-950 flex items-center justify-center text-emerald-400 text-xl font-bold border border-emerald-800/60">
-            🏛️
-          </div>
-          <h3 className="font-bold text-lg text-white">For Citizens</h3>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            Report complaints with geolocation details, receive real-time notifications, and verify issue completion before closure.
-          </p>
+      {/* 3-Step Process Section */}
+      <section className="space-y-10 max-w-5xl mx-auto">
+        <div className="text-center space-y-2">
+          <h2 className="text-xs font-extrabold text-teal-400 uppercase tracking-widest">Simple Workflow</h2>
+          <p className="text-2xl sm:text-3xl font-extrabold text-white">How CivicFix Works</p>
         </div>
 
-        <div className="glass-card p-6 space-y-3 glass-card-hover">
-          <div className="w-10 h-10 rounded-lg bg-blue-950 flex items-center justify-center text-blue-400 text-xl font-bold border border-blue-800/60">
-            👷
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="glass-panel p-8 space-y-4 relative group glass-panel-hover">
+            <div className="w-12 h-12 rounded-2xl bg-teal-950 border border-teal-800/80 text-teal-400 text-xl font-bold flex items-center justify-center shadow-lg">
+              1
+            </div>
+            <h3 className="text-lg font-bold text-white">Report</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Snap a description, pick your location on an interactive map, and submit your complaint in under 60 seconds.
+            </p>
           </div>
-          <h3 className="font-bold text-lg text-white">For Workers</h3>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            View assigned tasks, update progress status, upload resolution notes, and receive instant task reassignment alerts.
-          </p>
-        </div>
 
-        <div className="glass-card p-6 space-y-3 glass-card-hover">
-          <div className="w-10 h-10 rounded-lg bg-purple-950 flex items-center justify-center text-purple-400 text-xl font-bold border border-purple-800/60">
-            📊
+          <div className="glass-panel p-8 space-y-4 relative group glass-panel-hover">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-950 border border-cyan-800/80 text-cyan-400 text-xl font-bold flex items-center justify-center shadow-lg">
+              2
+            </div>
+            <h3 className="text-lg font-bold text-white">Track</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Watch real-time status updates as your report is routed to the responsible city department and assigned to field workers.
+            </p>
           </div>
-          <h3 className="font-bold text-lg text-white">Dept Admins</h3>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            Monitor department workload, route complaints to field workers, and track category/priority bottleneck metrics.
-          </p>
-        </div>
 
-        <div className="glass-card p-6 space-y-3 glass-card-hover">
-          <div className="w-10 h-10 rounded-lg bg-amber-950 flex items-center justify-center text-amber-400 text-xl font-bold border border-amber-800/60">
-            ⚡
+          <div className="glass-panel p-8 space-y-4 relative group glass-panel-hover">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-950 border border-emerald-800/80 text-emerald-400 text-xl font-bold flex items-center justify-center shadow-lg">
+              3
+            </div>
+            <h3 className="text-lg font-bold text-white">Resolve</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Review resolution evidence uploaded by municipal workers and verify that the issue has been fixed to your satisfaction.
+            </p>
           </div>
-          <h3 className="font-bold text-lg text-white">City Leadership</h3>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            Access city-wide dashboards, high-level resolution metrics, user role statistics, and department response times.
-          </p>
         </div>
       </section>
+
+      {/* What Can I Report Grid */}
+      <section className="space-y-10 max-w-6xl mx-auto">
+        <div className="text-center space-y-2">
+          <h2 className="text-xs font-extrabold text-teal-400 uppercase tracking-widest">Categories</h2>
+          <p className="text-2xl sm:text-3xl font-extrabold text-white">What Can You Report?</p>
+          <p className="text-xs text-slate-400">CivicFix handles municipal infrastructure and public safety issues.</p>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <CategoryCard icon="🕳️" name="Potholes & Roads" desc="Damaged asphalt & hazardous dips" />
+          <CategoryCard icon="💡" name="Streetlights" desc="Dark streets & flickering bulbs" />
+          <CategoryCard icon="🗑️" name="Garbage & Waste" desc="Overflowing bins & litter spots" />
+          <CategoryCard icon="💧" name="Water Leakage" desc="Broken mains & drainage issues" />
+          <CategoryCard icon="🚦" name="Traffic Signals" desc="Signal failures & sign damage" />
+          <CategoryCard icon="🌳" name="Parks & Recreation" desc="Fallen trees & playground repairs" />
+        </div>
+      </section>
+
+      {/* Why CivicFix Trust Cards */}
+      <section className="glass-panel p-10 max-w-5xl mx-auto space-y-8">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-slate-800">
+          <div className="space-y-1">
+            <h3 className="text-xl font-bold text-white">Why Citizens & Municipalities Choose CivicFix</h3>
+            <p className="text-xs text-slate-400">Designed for speed, accountability, and seamless city operations.</p>
+          </div>
+          <Link href="/register" className="btn-civic-primary text-xs px-6 py-3 whitespace-nowrap">
+            Join CivicFix Today
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <div className="text-teal-400 text-sm font-bold flex items-center gap-2">
+              <span>⚡</span> 100% Transparent Audit Trail
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Every status change, worker assignment, and timestamp is logged in an immutable activity timeline.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-cyan-400 text-sm font-bold flex items-center gap-2">
+              <span>🗺️</span> Geolocation Pinpointing
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Built-in interactive Leaflet maps ensure municipal repair crews locate the exact problem site.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-emerald-400 text-sm font-bold flex items-center gap-2">
+              <span>✅</span> Citizen Verification
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Complaints aren&apos;t closed until citizens confirm the work was completed or provide feedback.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CategoryCard({ icon, name, desc }: { icon: string; name: string; desc: string }) {
+  return (
+    <div className="glass-panel p-4 text-center space-y-2 glass-panel-hover flex flex-col items-center justify-center min-h-[140px]">
+      <div className="text-2xl mb-1">{icon}</div>
+      <h4 className="font-bold text-xs text-white leading-tight">{name}</h4>
+      <p className="text-[10px] text-slate-400 leading-tight">{desc}</p>
     </div>
   );
 }

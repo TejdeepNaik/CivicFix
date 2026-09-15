@@ -57,9 +57,10 @@ The production deployment consists of 4 Railway services within a single Railway
 2. Select the `CivicFix` repository.
 3. Under service **Settings**:
    * **Service Name**: `backend`
+   * **Root Directory**: Leave EMPTY or set to `/` *(Do NOT set to /backend so Docker build context includes root alembic/ migrations)*
    * **Build / Builder**: `Dockerfile`
    * **Dockerfile Path**: `backend/Dockerfile`
-   * **Custom Start Command**: `/bin/sh /app/backend/entrypoint.sh`
+   * **Custom Start Command**: `/bin/sh /app/backend/entrypoint.sh` (or leave empty as backend/Dockerfile defaults to CMD `["/bin/sh", "/app/backend/entrypoint.sh"]`)
    * **Healthcheck Path**: `/health`
 4. Under **Variables**, add the following environment variables:
 
