@@ -11,21 +11,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies first (layer cache)
-COPY backend/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN pip install --no-cache-dir -r ./backend/requirements.txt
 
-# Copy the application source
+# Copy application source and alembic migrations from repo root build context
 COPY backend/ ./backend/
 COPY alembic/ ./alembic/
 COPY alembic/alembic.ini ./alembic.ini
 
-# Create a non-root user for security
+# Create non-root user and set permissions
 RUN addgroup --system civicfix && adduser --system --ingroup civicfix civicfix
+RUN chown -R civicfix:civicfix /app
 USER civicfix
 
-# Expose backend port
+# Expose default backend port
 EXPOSE 8000
 
-# Production startup: run Uvicorn with the FastAPI app
-# Migrations must be applied separately (entrypoint.sh or initContainer)
-CMD ["/bin/sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+# Production startup: run entrypoint.sh (waits for DB, applies Alembic migrations, starts Uvicorn on dynamic $PORT)
+CMD ["/bin/sh", "/app/backend/entrypoint.sh"]
