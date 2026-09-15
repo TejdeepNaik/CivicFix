@@ -1,0 +1,206 @@
+import {
+  User,
+  Complaint,
+  ComplaintActivity,
+  Notification,
+  Department,
+  CitizenDashboardResponse,
+  WorkerDashboardResponse,
+  DepartmentDashboardResponse,
+  AdminDashboardResponse,
+  PaginatedList,
+} from "./types";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+const TOKEN_KEY = "civicfix_token";
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(TOKEN_KEY, token);
+  }
+}
+
+export function removeToken(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+async function request<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (!res.ok) {
+    let errorDetail = "An unexpected error occurred";
+    try {
+      const errJson = await res.json();
+      if (errJson.detail) {
+        if (typeof errJson.detail === "string") {
+          errorDetail = errJson.detail;
+        } else if (Array.isArray(errJson.detail)) {
+          errorDetail = errJson.detail.map((e: any) => e.msg || e.detail).join(", ");
+        }
+      }
+    } catch {
+      errorDetail = `HTTP ${res.status}: ${res.statusText}`;
+    }
+    throw new Error(errorDetail);
+  }
+
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Auth API
+// ---------------------------------------------------------------------------
+
+export async function loginApi(payload: Record<string, any>): Promise<{ access_token: string; token_type: string }> {
+  return request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function registerApi(payload: Record<string, any>): Promise<User> {
+  return request("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getMeApi(): Promise<User> {
+  return request("/auth/me");
+}
+
+// ---------------------------------------------------------------------------
+// Complaints API
+// ---------------------------------------------------------------------------
+
+export async function createComplaintApi(payload: Record<string, any>): Promise<Complaint> {
+  return request("/complaints", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getComplaintApi(id: string): Promise<Complaint> {
+  return request(`/complaints/${id}`);
+}
+
+export async function listComplaintsApi(params: Record<string, any> = {}): Promise<PaginatedList<Complaint>> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, val]) => {
+    if (val !== undefined && val !== null && val !== "") {
+      query.append(key, String(val));
+    }
+  });
+  const queryString = query.toString();
+  return request(`/complaints${queryString ? `?${queryString}` : ""}`);
+}
+
+export async function updateComplaintApi(id: string, payload: Record<string, any>): Promise<Complaint> {
+  return request(`/complaints/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function resolveComplaintApi(id: string, payload: { resolution_notes: string; resolution_evidence?: string }): Promise<Complaint> {
+  return request(`/complaints/${id}/resolve`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyComplaintApi(id: string, payload: { is_satisfied: boolean; feedback_notes?: string }): Promise<Complaint> {
+  return request(`/complaints/${id}/verify`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Departments API
+// ---------------------------------------------------------------------------
+
+export async function listDepartmentsApi(): Promise<Department[]> {
+  return request("/departments");
+}
+
+export async function getDepartmentApi(id: string): Promise<Department> {
+  return request(`/departments/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Activity API
+// ---------------------------------------------------------------------------
+
+export async function getComplaintActivityApi(complaintId: string): Promise<PaginatedList<ComplaintActivity>> {
+  return request(`/complaints/${complaintId}/activity`);
+}
+
+// ---------------------------------------------------------------------------
+// Notifications API
+// ---------------------------------------------------------------------------
+
+export async function listNotificationsApi(params: { unread_only?: boolean; page?: number; size?: number } = {}): Promise<PaginatedList<Notification>> {
+  const query = new URLSearchParams();
+  if (params.unread_only) query.append("unread_only", "true");
+  if (params.page) query.append("page", String(params.page));
+  if (params.size) query.append("size", String(params.size));
+  const queryString = query.toString();
+  return request(`/notifications${queryString ? `?${queryString}` : ""}`);
+}
+
+export async function markNotificationReadApi(id: string): Promise<Notification> {
+  return request(`/notifications/${id}/read`, {
+    method: "PATCH",
+  });
+}
+
+export async function markAllNotificationsReadApi(): Promise<{ marked_read: number }> {
+  return request("/notifications/read-all", {
+    method: "PATCH",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard API
+// ---------------------------------------------------------------------------
+
+export async function getCitizenDashboardApi(limit: number = 5): Promise<CitizenDashboardResponse> {
+  return request(`/dashboard/citizen?limit=${limit}`);
+}
+
+export async function getWorkerDashboardApi(limit: number = 5): Promise<WorkerDashboardResponse> {
+  return request(`/dashboard/worker?limit=${limit}`);
+}
+
+export async function getDepartmentDashboardApi(limit: number = 5): Promise<DepartmentDashboardResponse> {
+  return request(`/dashboard/department?limit=${limit}`);
+}
+
+export async function getAdminDashboardApi(limit: number = 5): Promise<AdminDashboardResponse> {
+  return request(`/dashboard/admin?limit=${limit}`);
+}

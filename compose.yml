@@ -1,0 +1,103 @@
+# CivicFix – Docker Compose
+# Usage:
+#   1. Copy .env.example to .env and fill in your secrets.
+#   2. docker compose up --build
+#
+# Services: postgres, redis, backend, frontend
+
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-civicfix}
+      POSTGRES_USER: ${POSTGRES_USER:-civicfix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-civicfix} -d ${POSTGRES_DB:-civicfix}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - civicfix_net
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - civicfix_net
+
+  # ── FastAPI Backend ────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    # Override CMD to use the entrypoint that waits for DB + runs migrations
+    command: ["/bin/sh", "/app/backend/entrypoint.sh"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-civicfix}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-civicfix}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      PROJECT_NAME: ${PROJECT_NAME:-CivicFix}
+      DEBUG: ${DEBUG:-false}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000}
+      REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      - civicfix_net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Next.js Frontend ───────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # This is baked into the browser JS bundle at build time.
+        # In production, set to the public URL of your backend (e.g. https://api.civicfix.example.com/api/v1)
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - civicfix_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  civicfix_net:
+    driver: bridge
