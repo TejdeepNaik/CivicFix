@@ -2,64 +2,64 @@ import React from "react";
 import { ComplaintStatusEnum, ComplaintPriorityEnum, ComplaintCategoryEnum, RoleEnum } from "../lib/types";
 
 export function StatusBadge({ status }: { status: string }) {
-  let style = "bg-slate-800/80 text-slate-300 border-slate-700";
+  let style = "bg-slate-100 text-slate-800 border-slate-300";
   let label = status;
 
   switch (status) {
     case ComplaintStatusEnum.SUBMITTED:
-      style = "bg-blue-950/80 text-blue-300 border-blue-800/60";
+      style = "bg-blue-50 text-blue-700 border-blue-200 font-semibold";
       label = "Submitted";
       break;
     case ComplaintStatusEnum.UNDER_REVIEW:
-      style = "bg-purple-950/80 text-purple-300 border-purple-800/60";
+      style = "bg-purple-50 text-purple-700 border-purple-200 font-semibold";
       label = "Under Review";
       break;
     case ComplaintStatusEnum.ASSIGNED:
-      style = "bg-cyan-950/80 text-cyan-300 border-cyan-800/60";
+      style = "bg-cyan-50 text-cyan-800 border-cyan-200 font-semibold";
       label = "Assigned";
       break;
     case ComplaintStatusEnum.IN_PROGRESS:
-      style = "bg-amber-950/80 text-amber-300 border-amber-800/60";
+      style = "bg-amber-50 text-amber-800 border-amber-300 font-semibold";
       label = "In Progress";
       break;
     case ComplaintStatusEnum.RESOLVED:
-      style = "bg-emerald-950/80 text-emerald-300 border-emerald-800/60 font-bold";
+      style = "bg-emerald-50 text-emerald-800 border-emerald-300 font-bold";
       label = "Resolved";
       break;
     case ComplaintStatusEnum.CLOSED:
-      style = "bg-teal-950/80 text-teal-300 border-teal-800/60";
+      style = "bg-slate-100 text-slate-700 border-slate-300 font-semibold";
       label = "Closed";
       break;
     case ComplaintStatusEnum.REJECTED:
-      style = "bg-rose-950/80 text-rose-300 border-rose-800/60";
+      style = "bg-rose-50 text-rose-700 border-rose-200 font-semibold";
       label = "Rejected";
       break;
   }
 
   return (
-    <span className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border inline-flex items-center gap-1.5 ${style}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+    <span className={`px-2.5 py-1 rounded-md text-[11px] border inline-flex items-center gap-1.5 ${style}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-75" />
       {label}
     </span>
   );
 }
 
 export function PriorityBadge({ priority }: { priority: string }) {
-  let style = "bg-slate-800 text-slate-300 border-slate-700";
+  let style = "bg-slate-100 text-slate-700 border-slate-200";
   const label = priority.toUpperCase();
 
   switch (priority) {
     case ComplaintPriorityEnum.LOW:
-      style = "bg-slate-900 text-slate-400 border-slate-800";
+      style = "bg-slate-100 text-slate-600 border-slate-200";
       break;
     case ComplaintPriorityEnum.MEDIUM:
-      style = "bg-sky-950/80 text-sky-300 border-sky-800/60";
+      style = "bg-sky-50 text-sky-800 border-sky-200";
       break;
     case ComplaintPriorityEnum.HIGH:
-      style = "bg-amber-950/80 text-amber-300 border-amber-800/60";
+      style = "bg-amber-100 text-amber-900 border-amber-300 font-semibold";
       break;
     case ComplaintPriorityEnum.CRITICAL:
-      style = "bg-rose-950/80 text-rose-300 border-rose-800/60 font-bold animate-pulse";
+      style = "bg-rose-100 text-rose-800 border-rose-300 font-bold animate-pulse";
       break;
   }
 
@@ -102,7 +102,7 @@ export function CategoryBadge({ category }: { category: string }) {
   }
 
   return (
-    <span className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-900/90 text-slate-300 border border-slate-800/80 inline-flex items-center gap-1.5 capitalize">
+    <span className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200 inline-flex items-center gap-1.5 capitalize">
       <span className="text-xs">{icon}</span>
       {label}
     </span>
@@ -110,22 +110,22 @@ export function CategoryBadge({ category }: { category: string }) {
 }
 
 export function RoleBadge({ role }: { role: string }) {
-  let style = "bg-slate-800 text-slate-300 border-slate-700";
+  let style = "bg-slate-100 text-slate-700 border-slate-200";
   const label = role.replace(/_/g, " ").toUpperCase();
 
   switch (role) {
     case RoleEnum.CITIZEN:
-      style = "bg-teal-950/80 text-teal-300 border-teal-800/60";
+      style = "bg-teal-50 text-teal-800 border-teal-200";
       break;
     case RoleEnum.WORKER:
-      style = "bg-amber-950/80 text-amber-300 border-amber-800/60";
+      style = "bg-amber-50 text-amber-800 border-amber-200";
       break;
     case RoleEnum.DEPARTMENT_ADMIN:
-      style = "bg-purple-950/80 text-purple-300 border-purple-800/60";
+      style = "bg-purple-50 text-purple-800 border-purple-200";
       break;
     case RoleEnum.CITY_ADMIN:
     case RoleEnum.SUPER_ADMIN:
-      style = "bg-rose-950/80 text-rose-300 border-rose-800/60 font-bold";
+      style = "bg-rose-50 text-rose-800 border-rose-200 font-bold";
       break;
   }
 

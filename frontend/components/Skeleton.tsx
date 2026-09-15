@@ -3,14 +3,14 @@ import React from "react";
 export function Skeleton({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`animate-pulse rounded-lg bg-slate-800/60 ${className}`}
+      className={`skeleton-base ${className}`}
     />
   );
 }
 
 export function SkeletonCard() {
   return (
-    <div className="glass-panel p-6 space-y-4">
+    <div className="civic-card p-6 space-y-4">
       <div className="flex items-center justify-between">
         <Skeleton className="h-5 w-1/3" />
         <Skeleton className="h-6 w-16" />
@@ -35,7 +35,7 @@ export function SkeletonDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="glass-panel p-5 space-y-3">
+          <div key={i} className="civic-card p-5 space-y-3">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-8 w-16" />
           </div>

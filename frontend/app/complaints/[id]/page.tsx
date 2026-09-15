@@ -27,8 +27,8 @@ import dynamic from "next/dynamic";
 const MapView = dynamic(() => import("../../../components/MapView"), {
   ssr: false,
   loading: () => (
-    <div className="h-48 w-full rounded-xl bg-slate-900 border border-slate-800 animate-pulse flex items-center justify-center text-slate-500 text-xs">
-      Loading map preview...
+    <div className="h-52 w-full rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 text-xs animate-pulse">
+      Loading location map…
     </div>
   ),
 });
@@ -53,7 +53,6 @@ function ComplaintDetailContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Workflow Modal States
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState("");
   const [resolutionEvidence, setResolutionEvidence] = useState("");
@@ -67,7 +66,6 @@ function ComplaintDetailContent() {
     if (!complaintId) return;
     setLoading(true);
     setError(null);
-
     try {
       const [cData, actData] = await Promise.all([
         getComplaintApi(complaintId),
@@ -86,8 +84,8 @@ function ComplaintDetailContent() {
           .catch(() => {});
       }
     } catch (err: any) {
-      setError(err.message || "Failed to load complaint details. Please check the URL.");
-    } finally {
+      setError(err.message || "Failed to load complaint details.");
+    } fontally: () => {
       setLoading(false);
     }
   };
@@ -125,7 +123,7 @@ function ComplaintDetailContent() {
       setShowVerifyModal(false);
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to update verification state.");
+      alert(err.message || "Failed to verify.");
     } finally {
       setVerifying(false);
     }
@@ -143,7 +141,8 @@ function ComplaintDetailContent() {
 
   if (loading) {
     return (
-      <div className="space-y-6 max-w-5xl mx-auto py-4">
+      <div className="space-y-5 max-w-5xl mx-auto py-4">
+        <SkeletonCard />
         <SkeletonCard />
         <SkeletonCard />
       </div>
@@ -152,12 +151,15 @@ function ComplaintDetailContent() {
 
   if (error || !complaint) {
     return (
-      <div className="max-w-xl mx-auto py-12 text-center space-y-4">
-        <div className="p-6 rounded-2xl bg-rose-950/80 border border-rose-800 text-rose-300 text-sm font-medium">
-          {error || "Complaint record not found"}
+      <div className="max-w-xl mx-auto py-16 text-center space-y-4 animate-fade-in">
+        <div className="p-6 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm">
+          {error || "Complaint not found"}
         </div>
-        <button onClick={() => router.back()} className="btn-civic-secondary text-xs px-5 py-2.5">
-          ← Back to Complaints
+        <button
+          onClick={() => router.back()}
+          className="btn-civic-secondary text-xs px-5 py-2.5"
+        >
+          ← Go Back
         </button>
       </div>
     );
@@ -170,158 +172,224 @@ function ComplaintDetailContent() {
     user?.role === RoleEnum.CITY_ADMIN ||
     user?.role === RoleEnum.SUPER_ADMIN;
 
-  return (
-    <div className="space-y-8 max-w-6xl mx-auto py-4">
-      {/* Top Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <button
-            onClick={() => router.back()}
-            className="text-xs text-slate-400 hover:text-white mb-1 inline-flex items-center gap-1 transition-colors"
-          >
-            ← Back to Directory
-          </button>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-black text-white">{complaint.title}</h1>
-          </div>
-          <p className="text-xs text-slate-400">
-            Reported on {new Date(complaint.created_at).toLocaleString()} • ID:{" "}
-            <span className="font-mono text-teal-400">{complaint.id.substring(0, 8)}</span>
-          </p>
-        </div>
+  const hasActions =
+    (
+      (isAssignedWorker || isAdmin) &&
+      (complaint.status === ComplaintStatusEnum.ASSIGNED ||
+        complaint.status === ComplaintStatusEnum.IN_PROGRESS)
+    ) ||
+    (isOwner && complaint.status === ComplaintStatusEnum.RESOLVED) ||
+    isAdmin;
 
-        <div className="flex items-center space-x-3">
-          <PriorityBadge priority={complaint.priority} />
-          <StatusBadge status={complaint.status} />
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto py-4 animate-fade-in">
+
+      {/* ── Breadcrumb & Header Card ── */}
+      <div className="space-y-3">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-700 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Service Directory
+        </button>
+
+        <div className="bg-[#0a2540] text-white p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-md flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div className="space-y-2 flex-1 min-w-0">
+            <div className="flex items-center space-x-2 text-xs font-mono text-amber-400">
+              <span>TRACKING ID:</span>
+              <span className="font-bold bg-amber-950/80 px-2.5 py-0.5 rounded border border-amber-800">
+                #{complaint.id.substring(0, 8).toUpperCase()}
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black leading-snug">
+              {complaint.title}
+            </h1>
+            <div className="text-xs text-slate-300">
+              Reported on {new Date(complaint.created_at).toLocaleDateString("en-US", {
+                year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit"
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+            <PriorityBadge priority={complaint.priority} />
+            <StatusBadge status={complaint.status} />
+          </div>
         </div>
       </div>
 
-      {/* Visual Resolution Pipeline Banner */}
-      <div className="glass-panel p-6 shadow-lg">
+      {/* ── 6-Stage Resolution Timeline ── */}
+      <div className="civic-card p-5 sm:p-6 bg-white">
         <StatusTimeline status={complaint.status} />
       </div>
 
-      {/* Main Grid: Complaint Details & Timeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Details & Actions */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="glass-panel p-6 space-y-6">
+      {/* ── Main Content Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* ── Left: Issue Details & Map ── */}
+        <div className="lg:col-span-2 space-y-5">
+
+          {/* Details Card */}
+          <div className="civic-card p-5 sm:p-6 space-y-5">
             <div className="space-y-2">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Description</h3>
-              <p className="text-sm text-slate-200 whitespace-pre-line leading-relaxed">{complaint.description}</p>
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Description & Notes
+              </h3>
+              <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">
+                {complaint.description}
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800 text-xs">
-              <div>
-                <span className="text-slate-500 block">Category</span>
-                <div className="mt-1"><CategoryBadge category={complaint.category} /></div>
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Category
+                </span>
+                <CategoryBadge category={complaint.category} />
               </div>
-              <div>
-                <span className="text-slate-500 block font-semibold">Location Address</span>
-                <span className="text-slate-200 font-medium mt-1 block">
-                  {complaint.address || `${complaint.latitude.toFixed(4)}, ${complaint.longitude.toFixed(4)}`}
+
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Location Address
+                </span>
+                <span className="text-xs font-semibold text-slate-800">
+                  {complaint.address ||
+                    `${complaint.latitude?.toFixed(4)}, ${complaint.longitude?.toFixed(4)}`}
                 </span>
               </div>
             </div>
 
-            <div className="mt-4 rounded-xl overflow-hidden border border-slate-800">
-              <MapView latitude={complaint.latitude} longitude={complaint.longitude} />
+            {/* Interactive Map */}
+            <div className="space-y-1.5 pt-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Geographic Location Pin
+              </span>
+              <div className="rounded-xl overflow-hidden border border-slate-300">
+                <MapView latitude={complaint.latitude} longitude={complaint.longitude} />
+              </div>
             </div>
 
-            {/* Resolution Notes Display */}
+            {/* Resolution Notes section if present */}
             {complaint.resolution_notes && (
-              <div className="mt-4 p-5 rounded-xl bg-teal-950/40 border border-teal-800/60 space-y-2">
-                <span className="text-xs font-bold text-teal-400 uppercase tracking-wider block">
-                  Work Completion & Resolution Notes
-                </span>
-                <p className="text-xs text-teal-200 leading-relaxed">{complaint.resolution_notes}</p>
+              <div className="p-5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-700 text-base font-bold">✓</span>
+                  <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                    Work Resolution Report
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-950 leading-relaxed">
+                  {complaint.resolution_notes}
+                </p>
                 {complaint.resolution_evidence && (
                   <a
                     href={complaint.resolution_evidence}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[11px] text-teal-300 underline font-mono block pt-1"
+                    className="inline-flex items-center gap-1.5 text-xs text-blue-700 hover:underline font-bold transition-colors pt-1"
                   >
-                    View Resolution Evidence →
+                    View Attached Work Evidence →
                   </a>
                 )}
               </div>
             )}
           </div>
 
-          {/* Workflow Action Panel */}
-          <div className="glass-panel p-6 space-y-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Available Actions</h3>
+          {/* Actions Panel */}
+          {hasActions && (
+            <div className="civic-card p-5 sm:p-6 space-y-4 bg-slate-50 border border-slate-300">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Municipal Action Panel
+              </h3>
 
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Worker or Admin Resolve Action */}
-              {(isAssignedWorker || isAdmin) &&
-                (complaint.status === ComplaintStatusEnum.ASSIGNED ||
-                  complaint.status === ComplaintStatusEnum.IN_PROGRESS) && (
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Worker/Admin resolve */}
+                {(isAssignedWorker || isAdmin) &&
+                  (complaint.status === ComplaintStatusEnum.ASSIGNED ||
+                    complaint.status === ComplaintStatusEnum.IN_PROGRESS) && (
+                    <button
+                      onClick={() => setShowResolveModal(true)}
+                      className="btn-civic-gold text-xs px-5 py-2.5 shadow-sm"
+                    >
+                      Mark Issue as Resolved ✓
+                    </button>
+                  )}
+
+                {/* Citizen verify */}
+                {isOwner && complaint.status === ComplaintStatusEnum.RESOLVED && (
                   <button
-                    onClick={() => setShowResolveModal(true)}
+                    onClick={() => setShowVerifyModal(true)}
                     className="btn-civic-primary text-xs px-5 py-2.5"
                   >
-                    Mark Issue as Resolved
+                    Verify & Confirm Resolution
                   </button>
                 )}
 
-              {/* Citizen Verification Action */}
-              {isOwner && complaint.status === ComplaintStatusEnum.RESOLVED && (
-                <button
-                  onClick={() => setShowVerifyModal(true)}
-                  className="btn-civic-primary text-xs px-5 py-2.5 bg-emerald-500 text-slate-950"
-                >
-                  Verify Resolution Status
-                </button>
-              )}
-
-              {/* Admin Department Routing */}
-              {isAdmin && (
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={complaint.department_id || ""}
-                    onChange={(e) => handleDeptRoute(e.target.value)}
-                    className="form-input-modern text-xs py-2"
-                  >
-                    <option value="">Route to Department...</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {!isAssignedWorker && !isOwner && !isAdmin && (
-                <p className="text-xs text-slate-500">No pending workflow actions for your role on this report.</p>
-              )}
+                {/* Admin department routing */}
+                {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={complaint.department_id || ""}
+                      onChange={(e) => handleDeptRoute(e.target.value)}
+                      className="input-civic text-xs py-2 max-w-[240px]"
+                    >
+                      <option value="">Assign to Department…</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} ({d.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Right Column: Activity Timeline Audit Trail */}
-        <div className="space-y-6">
-          <div className="glass-panel p-6 space-y-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Activity Audit Trail</h3>
+        {/* ── Right: Official Activity Audit Trail ── */}
+        <div className="space-y-5">
+          <div className="civic-card p-5 space-y-4 bg-white sticky top-24">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider pb-2 border-b border-slate-200">
+              Official Activity Audit Trail
+            </h3>
 
             {activities.length === 0 ? (
-              <p className="text-xs text-slate-500">No activity recorded yet.</p>
+              <p className="text-xs text-slate-500 py-4 text-center">
+                No activity recorded yet.
+              </p>
             ) : (
-              <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
-                {activities.map((act) => (
-                  <div key={act.id} className="relative pl-7 space-y-1">
-                    <span className="absolute left-1.5 top-1.5 w-3 h-3 rounded-full bg-teal-400 ring-4 ring-slate-950 shadow" />
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-200 capitalize">
+              <div className="space-y-0 relative">
+                {/* Vertical connecting line */}
+                <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-slate-200" />
+
+                {activities.map((act, idx) => (
+                  <div key={act.id} className="relative pl-7 pb-4">
+                    {/* Dot indicator */}
+                    <div
+                      className={`absolute left-0 top-1 w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center text-[9px] font-bold ${
+                        idx === 0
+                          ? "bg-blue-600 border-blue-700 text-white"
+                          : "bg-slate-100 border-slate-300 text-slate-500"
+                      }`}
+                    >
+                      {idx === 0 ? "●" : "○"}
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-bold text-slate-900 capitalize block">
                         {act.event_type.replace(/_/g, " ")}
                       </span>
+                      {act.message && (
+                        <p className="text-[11px] text-slate-600 leading-relaxed">{act.message}</p>
+                      )}
+                      <span className="text-[10px] text-slate-400 block">
+                        {new Date(act.created_at).toLocaleString()}
+                      </span>
                     </div>
-                    {act.message && <p className="text-xs text-slate-400 leading-relaxed">{act.message}</p>}
-                    <span className="text-[10px] text-slate-500 block">
-                      {new Date(act.created_at).toLocaleString()}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -330,37 +398,50 @@ function ComplaintDetailContent() {
         </div>
       </div>
 
-      {/* Modal: Mark Resolved */}
+      {/* ── Modal: Mark Resolved ── */}
       {showResolveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="glass-panel max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fade-in">
-            <h3 className="text-lg font-bold text-white">Resolve Complaint</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="civic-card max-w-lg w-full p-6 space-y-5 bg-white shadow-2xl animate-slide-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="text-base font-bold text-slate-900">Submit Work Completion Report</h3>
+              <button
+                onClick={() => setShowResolveModal(false)}
+                className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+              >
+                ✕
+              </button>
+            </div>
+
             <form onSubmit={handleResolve} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Resolution Notes (Min 5 chars)</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Resolution & Repair Notes <span className="text-rose-600">*</span>
+                </label>
                 <textarea
                   required
                   minLength={5}
-                  rows={3}
+                  rows={4}
                   value={resolutionNotes}
                   onChange={(e) => setResolutionNotes(e.target.value)}
-                  placeholder="Describe the repair actions taken..."
-                  className="form-input-modern"
+                  placeholder="Describe field repair actions completed, materials installed, and outcome..."
+                  className="input-civic text-xs resize-none"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Evidence Link (Optional)</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Work Evidence Photo / Document URL (Optional)
+                </label>
                 <input
                   type="text"
                   value={resolutionEvidence}
                   onChange={(e) => setResolutionEvidence(e.target.value)}
-                  placeholder="https://evidence-url..."
-                  className="form-input-modern"
+                  placeholder="https://..."
+                  className="input-civic text-xs"
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-2 pt-2">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowResolveModal(false)}
@@ -371,7 +452,7 @@ function ComplaintDetailContent() {
                 <button
                   type="submit"
                   disabled={resolving}
-                  className="btn-civic-primary text-xs px-5 py-2"
+                  className="btn-civic-gold text-xs px-5 py-2"
                 >
                   {resolving ? "Submitting..." : "Confirm Resolution"}
                 </button>
@@ -381,32 +462,43 @@ function ComplaintDetailContent() {
         </div>
       )}
 
-      {/* Modal: Citizen Verification */}
+      {/* ── Modal: Citizen Verification ── */}
       {showVerifyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="glass-panel max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fade-in">
-            <h3 className="text-lg font-bold text-white">Verify Resolution</h3>
-            <p className="text-xs text-slate-400">
-              Are you satisfied with the work completed for this complaint?
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="civic-card max-w-lg w-full p-6 space-y-5 bg-white shadow-2xl animate-slide-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="text-base font-bold text-slate-900">Verify & Close Request</h3>
+              <button
+                onClick={() => setShowVerifyModal(false)}
+                className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Is the reported issue fixed to your satisfaction? Your feedback helps maintain municipal service standards.
             </p>
 
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Optional Feedback</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                Resident Feedback (Optional)
+              </label>
               <textarea
                 rows={3}
                 value={feedbackNotes}
                 onChange={(e) => setFeedbackNotes(e.target.value)}
-                placeholder="Add any feedback for the municipal crew..."
-                className="form-input-modern"
+                placeholder="Any additional feedback for city field workers..."
+                className="input-civic text-xs resize-none"
               />
             </div>
 
-            <div className="flex items-center justify-end space-x-3 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
               <button
                 type="button"
                 disabled={verifying}
                 onClick={() => handleVerify(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900"
+                className="btn-civic-secondary text-xs px-4 py-2 text-rose-700 border-rose-300 hover:bg-rose-50"
               >
                 Request Rework
               </button>
@@ -416,12 +508,13 @@ function ComplaintDetailContent() {
                 onClick={() => handleVerify(true)}
                 className="btn-civic-primary text-xs px-5 py-2"
               >
-                Accept & Close Complaint
+                {verifying ? "Saving..." : "Accept & Close Request"}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

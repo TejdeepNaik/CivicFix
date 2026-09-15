@@ -34,68 +34,85 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto py-12 px-4 space-y-6">
-      <div className="text-center space-y-2">
-        <div className="w-12 h-12 rounded-2xl bg-teal-950 border border-teal-800 text-teal-400 font-black text-xl flex items-center justify-center mx-auto shadow-lg">
-          CF
+    <div className="min-h-[75vh] grid grid-cols-1 lg:grid-cols-2 rounded-2xl overflow-hidden border border-slate-300 bg-white shadow-xl my-4 animate-fade-in">
+      {/* Left Column: Product Visual & Civic Narrative */}
+      <div className="relative hidden lg:flex flex-col justify-between p-12 bg-[#0a2540] text-white overflow-hidden">
+        <div className="relative z-10 flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-lg bg-[#d97706] text-white font-black text-sm flex items-center justify-center">
+            311
+          </div>
+          <span className="font-extrabold text-xl tracking-tight text-white">CivicFix 311</span>
         </div>
-        <h1 className="text-2xl font-bold text-white">Welcome Back</h1>
-        <p className="text-xs text-slate-400">Sign in to your CivicFix account</p>
+
+        <div className="relative z-10 space-y-4 max-w-md my-auto">
+          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">Official Access</span>
+          <h2 className="text-3xl font-black text-white leading-tight">
+            Keep our city clean, safe, and moving forward.
+          </h2>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Access your personalized 311 portal to track service request status, view field crew assignments, and verify completed infrastructure repairs.
+          </p>
+        </div>
+
+        <div className="relative z-10 pt-6 border-t border-slate-700 flex items-center justify-between text-xs text-slate-400 font-medium">
+          <span>Municipal Service Infrastructure System</span>
+          <span className="text-amber-400 font-mono">v1.0.0</span>
+        </div>
       </div>
 
-      <div className="glass-panel p-8 space-y-6 shadow-2xl">
+      {/* Right Column: Clean Auth Form */}
+      <div className="p-8 sm:p-12 flex flex-col justify-center space-y-8 bg-white">
+        <div className="space-y-2">
+          <span className="text-xs font-bold text-blue-700 uppercase tracking-wider block">Portal Sign In</span>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900">Sign In to CivicFix 311</h1>
+          <p className="text-xs text-slate-600">Enter your credentials to access your civic account</p>
+        </div>
+
         {error && (
-          <div className="p-4 rounded-xl bg-rose-950/80 border border-rose-800/80 text-rose-300 text-xs font-medium space-y-1">
-            <span className="font-bold block">Authentication Failed</span>
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold space-y-1">
+            <span className="font-bold block">Sign In Failed</span>
             <p>{error}</p>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Email Address</label>
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Email Address</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="form-input-modern"
+              className="input-civic text-xs"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Password</label>
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Password</label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="form-input-modern"
+              className="input-civic text-xs"
             />
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="btn-civic-primary w-full text-xs py-3 mt-2"
+            className="btn-civic-primary w-full text-xs py-3.5 mt-2"
           >
-            {submitting ? (
-              <span className="flex items-center gap-2">
-                <span className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                Signing In...
-              </span>
-            ) : (
-              "Sign In to Account"
-            )}
+            {submitting ? "Signing In..." : "Sign In to Account →"}
           </button>
         </form>
 
-        <div className="pt-4 border-t border-slate-800/80 text-center text-xs text-slate-400">
+        <div className="pt-4 border-t border-slate-200 text-center text-xs text-slate-600">
           Don&apos;t have an account yet?{" "}
-          <Link href="/register" className="text-teal-400 font-bold hover:underline">
-            Create an Account
+          <Link href="/register" className="text-blue-700 font-bold hover:underline">
+            Create a Resident Account
           </Link>
         </div>
       </div>

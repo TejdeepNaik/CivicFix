@@ -37,29 +37,29 @@ export function StatusTimeline({ status }: { status: ComplaintStatusEnum }) {
 
   if (isRejected) {
     return (
-      <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs font-semibold flex items-center justify-between">
-        <span>Status: Rejected by Department</span>
-        <span className="px-2 py-0.5 rounded bg-rose-900/60 text-rose-200">Closed</span>
+      <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center justify-between">
+        <span>Status: Request Rejected by Department</span>
+        <span className="px-2.5 py-0.5 rounded bg-rose-200 text-rose-900 font-bold">Closed</span>
       </div>
     );
   }
 
   return (
-    <div className="w-full space-y-3 py-2">
-      <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+    <div className="w-full space-y-4 py-2">
+      <div className="flex items-center justify-between text-xs font-bold text-slate-700 uppercase tracking-wider">
         <span>Resolution Progress Pipeline</span>
-        <span className="text-teal-400 font-semibold lowercase">
+        <span className="text-blue-700 font-semibold lowercase">
           Stage {currentIndex + 1} of {STAGES.length}
         </span>
       </div>
 
       <div className="relative flex items-center justify-between w-full">
-        {/* Background Connecting Line */}
-        <div className="absolute top-1/2 left-0 right-0 h-1 -translate-y-1/2 bg-slate-800 rounded-full z-0" />
-        
-        {/* Active Progress Line */}
+        {/* Background Line */}
+        <div className="absolute top-1/2 left-0 right-0 h-1.5 -translate-y-1/2 bg-slate-200 rounded-full z-0" />
+
+        {/* Active Line */}
         <div
-          className="absolute top-1/2 left-0 h-1 -translate-y-1/2 bg-gradient-to-r from-teal-500 to-emerald-400 rounded-full z-0 transition-all duration-500"
+          className="absolute top-1/2 left-0 h-1.5 -translate-y-1/2 bg-blue-600 rounded-full z-0 transition-all duration-500"
           style={{
             width: `${(currentIndex / (STAGES.length - 1)) * 100}%`,
           }}
@@ -69,11 +69,11 @@ export function StatusTimeline({ status }: { status: ComplaintStatusEnum }) {
           const isPassed = idx < currentIndex;
           const isCurrent = idx === currentIndex;
 
-          let circleClass = "bg-slate-900 border-slate-700 text-slate-500";
+          let circleClass = "bg-white border-slate-300 text-slate-400";
           if (isPassed) {
-            circleClass = "bg-teal-500 border-teal-400 text-slate-950 shadow-md shadow-teal-500/30";
+            circleClass = "bg-emerald-600 border-emerald-600 text-white shadow-sm";
           } else if (isCurrent) {
-            circleClass = "bg-teal-400 border-white text-slate-950 ring-4 ring-teal-500/20 shadow-lg shadow-teal-400/40 animate-pulse";
+            circleClass = "bg-blue-600 border-blue-700 text-white ring-4 ring-blue-100 shadow-md animate-pulse";
           }
 
           return (
@@ -85,11 +85,11 @@ export function StatusTimeline({ status }: { status: ComplaintStatusEnum }) {
               </div>
 
               <span
-                className={`text-[10px] font-semibold mt-2 text-center transition-colors whitespace-nowrap ${
+                className={`text-[11px] font-medium mt-2 text-center transition-colors whitespace-nowrap ${
                   isCurrent
-                    ? "text-teal-400 font-bold"
+                    ? "text-blue-800 font-bold"
                     : isPassed
-                    ? "text-slate-300"
+                    ? "text-slate-800 font-semibold"
                     : "text-slate-500"
                 }`}
               >
