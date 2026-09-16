@@ -1,8 +1,9 @@
 import React from "react";
 import Link from "next/link";
+import { Icon, IconName } from "./Icons";
 
 interface EmptyStateProps {
-  icon?: string;
+  icon?: IconName;
   title: string;
   description: string;
   actionLabel?: string;
@@ -11,7 +12,7 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  icon = "📋",
+  icon = "file-text",
   title,
   description,
   actionLabel,
@@ -19,14 +20,14 @@ export function EmptyState({
   onAction,
 }: EmptyStateProps) {
   return (
-    <div className="civic-card p-8 text-center space-y-4 max-w-md mx-auto my-6 border-dashed border-slate-300 bg-slate-50/50">
-      <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 text-2xl flex items-center justify-center mx-auto shadow-inner text-slate-700">
-        {icon}
+    <div className="civic-card p-10 text-center space-y-4 max-w-md mx-auto my-6 border-dashed border-slate-300 bg-slate-50/60">
+      <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-400 shadow-sm">
+        <Icon name={icon} size={26} />
       </div>
 
       <div className="space-y-1">
         <h3 className="text-base font-bold text-slate-900">{title}</h3>
-        <p className="text-xs text-slate-600 leading-relaxed">{description}</p>
+        <p className="text-sm text-slate-500 leading-relaxed">{description}</p>
       </div>
 
       {actionLabel && (

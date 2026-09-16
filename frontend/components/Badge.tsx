@@ -1,5 +1,6 @@
 import React from "react";
 import { ComplaintStatusEnum, ComplaintPriorityEnum, ComplaintCategoryEnum, RoleEnum } from "../lib/types";
+import { Icon, categoryIconName } from "./Icons";
 
 export function StatusBadge({ status }: { status: string }) {
   let style = "bg-slate-100 text-slate-800 border-slate-300";
@@ -15,7 +16,7 @@ export function StatusBadge({ status }: { status: string }) {
       label = "Under Review";
       break;
     case ComplaintStatusEnum.ASSIGNED:
-      style = "bg-cyan-50 text-cyan-800 border-cyan-200 font-semibold";
+      style = "bg-sky-50 text-sky-800 border-sky-200 font-semibold";
       label = "Assigned";
       break;
     case ComplaintStatusEnum.IN_PROGRESS:
@@ -23,7 +24,7 @@ export function StatusBadge({ status }: { status: string }) {
       label = "In Progress";
       break;
     case ComplaintStatusEnum.RESOLVED:
-      style = "bg-emerald-50 text-emerald-800 border-emerald-300 font-bold";
+      style = "bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold";
       label = "Resolved";
       break;
     case ComplaintStatusEnum.CLOSED:
@@ -59,7 +60,7 @@ export function PriorityBadge({ priority }: { priority: string }) {
       style = "bg-amber-100 text-amber-900 border-amber-300 font-semibold";
       break;
     case ComplaintPriorityEnum.CRITICAL:
-      style = "bg-rose-100 text-rose-800 border-rose-300 font-bold animate-pulse";
+      style = "bg-rose-100 text-rose-800 border-rose-300 font-bold";
       break;
   }
 
@@ -71,39 +72,11 @@ export function PriorityBadge({ priority }: { priority: string }) {
 }
 
 export function CategoryBadge({ category }: { category: string }) {
-  let icon = "📌";
   const label = category.replace(/_/g, " ");
 
-  switch (category) {
-    case ComplaintCategoryEnum.POTHOLE:
-      icon = "🕳️";
-      break;
-    case ComplaintCategoryEnum.STREETLIGHT:
-      icon = "💡";
-      break;
-    case ComplaintCategoryEnum.GARBAGE:
-      icon = "🗑️";
-      break;
-    case ComplaintCategoryEnum.WATER_LEAK:
-      icon = "💧";
-      break;
-    case ComplaintCategoryEnum.TRAFFIC_SIGNAL:
-      icon = "🚦";
-      break;
-    case ComplaintCategoryEnum.DRAINAGE:
-      icon = "🌊";
-      break;
-    case ComplaintCategoryEnum.NOISE_POLLUTION:
-      icon = "📢";
-      break;
-    case ComplaintCategoryEnum.OTHER:
-      icon = "📌";
-      break;
-  }
-
   return (
-    <span className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200 inline-flex items-center gap-1.5 capitalize">
-      <span className="text-xs">{icon}</span>
+    <span className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 inline-flex items-center gap-1.5 capitalize">
+      <Icon name={categoryIconName(category)} size={14} className="text-slate-500" />
       {label}
     </span>
   );
