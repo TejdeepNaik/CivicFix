@@ -115,19 +115,19 @@ function NotificationsContent() {
   const groups = groupByDay(notifications);
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto py-4 animate-fade-in">
+    <div className="space-y-5 max-w-3xl mx-auto py-4 animate-fade-in">
 
-      {/* ── Header ── */}
-      <div className="bg-[#0a2540] text-white p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-md flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-            Inbox & Messages
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+        <div className="space-y-0.5">
+          <span className="text-xs font-bold text-sky-700 uppercase tracking-wider block">
+            Government Communications
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black">
-            311 Service Notifications
+          <h1 className="text-xl font-black text-slate-900">
+            Inbox & Alerts
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300">
-            Stay updated on your reported requests and department workflow progress.
+          <p className="text-xs text-slate-600">
+            Official department notifications regarding your reported issues and verification requests.
           </p>
         </div>
 
@@ -135,59 +135,57 @@ function NotificationsContent() {
           <button
             onClick={handleMarkAllRead}
             disabled={markingAll}
-            className="btn-civic-gold text-xs px-4 py-2 shrink-0 shadow-sm"
+            className="btn-gov-secondary text-xs px-3.5 py-1.5 shrink-0"
           >
             {markingAll ? "Marking..." : `Mark all read (${unreadCount})`}
           </button>
         )}
       </div>
 
-      {/* ── Filter Tabs ── */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-200 border border-slate-300 w-fit">
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1 p-1 rounded-md bg-slate-100 border border-slate-200 w-fit">
         <TabButton active={!unreadOnly} onClick={() => setUnreadOnly(false)}>
-          All Notifications
+          All
         </TabButton>
         <TabButton active={unreadOnly} onClick={() => setUnreadOnly(true)}>
           Unread{unreadCount > 0 && (
-            <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-500 text-slate-950">
+            <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-sky-600 text-white">
               {unreadCount}
             </span>
           )}
         </TabButton>
       </div>
 
-      {/* ── Notification List ── */}
+      {/* List */}
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : error ? (
-        <div className="p-5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-medium">
+        <div className="p-3.5 rounded bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold">
           {error}
         </div>
       ) : notifications.length === 0 ? (
         <EmptyState
           icon="🔔"
-          title={unreadOnly ? "All caught up!" : "No notifications yet"}
+          title={unreadOnly ? "No unread alerts" : "No notifications yet"}
           description={
             unreadOnly
               ? "You have no unread notifications at this time."
-              : "Notifications will appear here as your requests progress."
+              : "Official department notifications will appear here as your reports progress."
           }
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {groups.map((group) => (
             <div key={group.label} className="space-y-2">
-              {/* Group header */}
               <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   {group.label}
                 </span>
                 <div className="flex-1 h-px bg-slate-200" />
               </div>
 
-              {/* Group items */}
               <div className="space-y-2">
                 {group.items.map((n) => (
                   <NotificationRow
@@ -220,44 +218,42 @@ function NotificationRow({
 
   return (
     <div
-      className={`flex items-start gap-4 p-4 rounded-xl border transition-all civic-card ${
+      className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all gov-card ${
         !n.is_read
-          ? "border-blue-300 bg-blue-50/60"
+          ? "border-sky-300 bg-sky-50/50 shadow-xs"
           : "border-slate-200 bg-white"
       }`}
     >
-      {/* Icon */}
       <div
-        className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${
-          !n.is_read ? "bg-blue-100 border border-blue-300 text-blue-900" : "bg-slate-100 border border-slate-200 text-slate-700"
+        className={`w-8 h-8 rounded flex items-center justify-center text-sm shrink-0 ${
+          !n.is_read ? "bg-sky-100 border border-sky-300 text-sky-900" : "bg-slate-100 border border-slate-200 text-slate-600"
         }`}
       >
         {icon}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0 space-y-1">
+      <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-bold text-slate-900 capitalize">
             {n.notification_type.replace(/_/g, " ")}
           </span>
           {!n.is_read && (
-            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500 text-slate-950">
-              NEW
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-600 text-white">
+              UNREAD
             </span>
           )}
         </div>
 
         <p className="text-xs text-slate-700 leading-relaxed">{n.message}</p>
 
-        <div className="flex items-center gap-3 pt-1">
-          <span className="text-[10px] text-slate-500 font-medium">{timeStr}</span>
+        <div className="flex items-center gap-3 pt-0.5">
+          <span className="text-[10px] text-slate-400 font-mono">{timeStr}</span>
           {n.complaint_id && (
             <Link
               href={`/complaints/${n.complaint_id}`}
-              className="text-[11px] text-blue-700 hover:underline font-bold transition-colors"
+              className="text-[11px] text-sky-700 hover:underline font-bold transition-colors"
             >
-              View Issue →
+              View Case File →
             </Link>
           )}
           {!n.is_read && (
@@ -286,9 +282,9 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center ${
+      className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all flex items-center ${
         active
-          ? "bg-[#0a2540] text-white shadow-sm"
+          ? "bg-[#0f2942] text-white shadow-xs"
           : "text-slate-600 hover:text-slate-900"
       }`}
     >

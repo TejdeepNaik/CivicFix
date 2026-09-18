@@ -9,6 +9,7 @@ import {
   DepartmentDashboardResponse,
   AdminDashboardResponse,
   PaginatedList,
+  ComplaintAnalysisResponse,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -97,6 +98,34 @@ export async function getMeApi(): Promise<User> {
 // Complaints API
 // ---------------------------------------------------------------------------
 
+export async function uploadEvidenceApi(file: File): Promise<{ evidence_url: string }> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}/complaints/upload-evidence`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let errorDetail = "Failed to upload photo evidence";
+    try {
+      const errJson = await res.json();
+      if (errJson.detail) errorDetail = errJson.detail;
+    } catch {}
+    throw new Error(errorDetail);
+  }
+
+  return res.json();
+}
+
 export async function createComplaintApi(payload: Record<string, any>): Promise<Complaint> {
   return request("/complaints", {
     method: "POST",
@@ -137,6 +166,12 @@ export async function verifyComplaintApi(id: string, payload: { is_satisfied: bo
   return request(`/complaints/${id}/verify`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function analyzeComplaintApi(id: string): Promise<ComplaintAnalysisResponse> {
+  return request(`/complaints/${id}/analyze`, {
+    method: "POST",
   });
 }
 

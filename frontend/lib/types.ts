@@ -85,6 +85,7 @@ export interface Complaint {
   citizen_id: string;
   assigned_worker_id?: string | null;
   department_id?: string | null;
+  cluster_id?: string | null;
   title: string;
   description: string;
   category: ComplaintCategoryEnum;
@@ -93,6 +94,7 @@ export interface Complaint {
   latitude: number;
   longitude: number;
   address?: string | null;
+  evidence_url?: string | null;
   assigned_at?: string | null;
   resolution_notes?: string | null;
   resolution_evidence?: string | null;
@@ -104,6 +106,31 @@ export interface Complaint {
   verified_at?: string | null;
   created_at: string;
   updated_at?: string | null;
+}
+
+export interface DuplicateMatch {
+  complaint_id: string;
+  title: string;
+  status: string;
+  category: string;
+  similarity_score: number;
+  text_similarity?: number | null;
+  image_similarity?: number | null;
+  distance_meters: number;
+  reasoning_signals?: string[];
+}
+
+export interface ComplaintAnalysisResponse {
+  complaint_id: string;
+  cluster_id?: string | null;
+  cluster_report_count: number;
+  cluster_priority: ComplaintPriorityEnum;
+  suggested_category: ComplaintCategoryEnum;
+  suggested_priority: ComplaintPriorityEnum;
+  summary: string;
+  is_duplicate_likely: boolean;
+  potential_duplicates: DuplicateMatch[];
+  confidence: number;
 }
 
 export interface ComplaintActivity {

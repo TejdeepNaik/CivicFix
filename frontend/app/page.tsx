@@ -6,54 +6,89 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { ComplaintCategoryEnum } from "../lib/types";
 
-const SERVICE_CATEGORIES = [
+const ISSUE_CATEGORIES = [
   {
     id: ComplaintCategoryEnum.POTHOLE,
-    title: "Potholes & Road Repairs",
-    icon: "🕳️",
-    desc: "Report street potholes, pavement damage, sinkholes, and roadway hazards.",
+    title: "Potholes & Road Damage",
+    icon: (
+      <svg className="w-5 h-5 text-sky-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+      </svg>
+    ),
+    desc: "Roadway cracks, pavement hazards, asphalt erosion, and sinkholes.",
   },
   {
     id: ComplaintCategoryEnum.STREETLIGHT,
-    title: "Broken Streetlights",
-    icon: "💡",
-    desc: "Report dark light poles, flickering fixtures, or damaged light structures.",
+    title: "Streetlights & Lighting",
+    icon: (
+      <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    ),
+    desc: "Dark streetlamps, broken light fixtures, flickering poles, and wiring issues.",
   },
   {
     id: ComplaintCategoryEnum.GARBAGE,
-    title: "Garbage Overflow & Sanitation",
-    icon: "🗑️",
-    desc: "Report uncollected trash, illegal dumping, overflow bins, or alley debris.",
+    title: "Garbage & Public Sanitation",
+    icon: (
+      <svg className="w-5 h-5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      </svg>
+    ),
+    desc: "Overflowing public waste bins, illegal dumping, alley debris, and missed pickups.",
   },
   {
     id: ComplaintCategoryEnum.WATER_LEAK,
-    title: "Water Main & Pipe Leaks",
-    icon: "💧",
-    desc: "Report clean water leaks, hydrants gushing, or main pipe breaks.",
+    title: "Water Leaks & Pipe Spills",
+    icon: (
+      <svg className="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+      </svg>
+    ),
+    desc: "Main line breaks, open fire hydrants, clean water waste, and pressure drops.",
   },
   {
     id: ComplaintCategoryEnum.TRAFFIC_SIGNAL,
     title: "Traffic Signals & Signs",
-    icon: "🚦",
-    desc: "Report broken traffic lights, damaged stop signs, or missing street markers.",
+    icon: (
+      <svg className="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    ),
+    desc: "Malfunctioning intersection lights, damaged stop signs, and missing road markers.",
   },
   {
     id: ComplaintCategoryEnum.DRAINAGE,
-    title: "Drainage & Sewer Backups",
-    icon: "🌊",
-    desc: "Report clogged storm drains, standing street water, or sewer overflow.",
+    title: "Drainage & Flooding",
+    icon: (
+      <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+      </svg>
+    ),
+    desc: "Clogged catch basins, storm sewer backups, standing street water, and drain grates.",
+  },
+];
+
+const HOW_IT_WORKS = [
+  {
+    step: "1",
+    title: "Report a Problem",
+    desc: "Submit complaint details, GPS location pin, and optional photo evidence.",
   },
   {
-    id: ComplaintCategoryEnum.NOISE_POLLUTION,
-    title: "Noise & Nuisance Issues",
-    icon: "📢",
-    desc: "Report commercial noise violations, illegal construction hours, or loud equipment.",
+    step: "2",
+    title: "AI Analysis & Routing",
+    desc: "Automated engine checks duplicate reports and routes to the responsible department.",
   },
   {
-    id: ComplaintCategoryEnum.OTHER,
-    title: "Other City Services",
-    icon: "📋",
-    desc: "Submit general non-emergency city infrastructure inquiries and maintenance requests.",
+    step: "3",
+    title: "Field Crew Dispatch",
+    desc: "Assigned municipal workers receive task details with precise location coordinates.",
+  },
+  {
+    step: "4",
+    title: "Resolution & Verification",
+    desc: "Worker resolves the issue, uploads proof, and reporter verifies completion.",
   },
 ];
 
@@ -72,218 +107,230 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-12 pb-12 animate-fade-in">
+    <div className="space-y-8 pb-8 animate-fade-in max-w-7xl mx-auto">
       
-      {/* ── 1. HERO HEADER: CHI311 Service Banner ── */}
-      <section className="bg-[#0a2540] text-white rounded-2xl p-6 sm:p-12 shadow-xl border border-slate-700/60 relative overflow-hidden">
-        {/* Subtle geometric background overlay */}
-        <div className="absolute right-0 top-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-6">
+      {/* ── HERO SECTION: Restrained Government Service Banner ── */}
+      <section className="bg-[#0f2942] text-white p-6 sm:p-8 rounded-xl border border-slate-800 shadow-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           
-          <div className="inline-flex items-center space-x-2 bg-slate-800/90 px-3.5 py-1.5 rounded-full border border-slate-700 text-amber-400 text-xs font-bold uppercase tracking-wider">
-            <span>Official City 311 Service Portal</span>
-          </div>
+          <div className="lg:col-span-7 space-y-4">
+            <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded bg-slate-800/80 border border-slate-700 text-sky-300 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+              <span>Official Civic Service Portal</span>
+            </div>
 
-          <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
-            How can we help you today?
-          </h1>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-snug">
+              Report civic problems. Track progress. Improve your community.
+            </h1>
 
-          <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Submit non-emergency service requests, report municipal infrastructure issues, and track field repair progress in real time across the city.
-          </p>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
+              CivicFix enables residents to submit infrastructure repair requests directly to municipal public works. Track status updates and verified resolutions in real time.
+            </p>
 
-          {/* Quick Search & Tracking Input */}
-          <form onSubmit={handleSearchSubmit} className="max-w-2xl mx-auto pt-2">
-            <div className="flex flex-col sm:flex-row gap-2 bg-white p-2 rounded-xl shadow-lg border border-slate-200">
-              <div className="relative flex-1">
-                <svg
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <Link href="/complaints/create" className="btn-gov-blue text-xs px-5 py-2.5 shadow-xs">
+                Report an Issue
+              </Link>
+              <Link href="/complaints" className="btn-gov-secondary text-xs px-5 py-2.5">
+                Explore Issues Directory
+              </Link>
+            </div>
+
+            {/* Quick Search Bar */}
+            <form onSubmit={handleSearchSubmit} className="pt-2 max-w-lg">
+              <div className="flex bg-slate-900/90 p-1 rounded-lg border border-slate-700">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search service name, category, or tracking ID..."
-                  className="w-full pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 border-none outline-none rounded-lg"
+                  placeholder="Search reported issues by title, street, or category..."
+                  className="w-full bg-transparent px-3 py-1.5 text-xs text-white placeholder-slate-400 outline-none"
                 />
+                <button type="submit" className="btn-gov-blue text-xs px-3.5 py-1.5 shrink-0">
+                  Search
+                </button>
               </div>
-              <button
-                type="submit"
-                className="btn-civic-primary text-xs px-6 py-3 shrink-0"
-              >
-                Search & Track →
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
 
-          {/* Dual Action Callouts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 max-w-3xl mx-auto text-left">
-            <div className="bg-[#173859] p-5 rounded-xl border border-blue-400/30 space-y-3 flex flex-col justify-between">
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider">Report a Problem</div>
-                <h3 className="text-lg font-bold text-white">Submit a New Request</h3>
-                <p className="text-xs text-slate-300">
-                  Report a pothole, streetlight outage, water leak, or sanitation hazard with pinpoint map accuracy.
-                </p>
+          {/* RIGHT: Compact Municipal Register Preview */}
+          <div className="lg:col-span-5">
+            <div className="gov-card bg-slate-900 border-slate-800 text-white p-4 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+                <span className="font-bold text-sky-400">Live Service Status</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 text-[10px] font-mono border border-emerald-800">
+                  System Active
+                </span>
               </div>
-              <Link
-                href="/complaints/create"
-                className="btn-civic-gold text-xs px-5 py-2.5 w-fit"
-              >
-                Submit Request Now →
-              </Link>
-            </div>
 
-            <div className="bg-[#173859] p-5 rounded-xl border border-blue-400/30 space-y-3 flex flex-col justify-between">
-              <div className="space-y-1">
-                <div className="text-xs font-bold text-blue-300 uppercase tracking-wider">Check Status</div>
-                <h3 className="text-lg font-bold text-white">Track Existing Complaint</h3>
-                <p className="text-xs text-slate-300">
-                  View department assignments, worker dispatch logs, and completion evidence for reported issues.
-                </p>
+              <div className="space-y-2">
+                <div className="p-2.5 rounded bg-slate-800/90 border border-slate-700 space-y-0.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-white truncate max-w-[200px]">Main Street Pothole Repair</span>
+                    <span className="gov-chip gov-chip-progress text-[10px]">In Progress</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">Public Works Crew Dispatched</p>
+                </div>
+
+                <div className="p-2.5 rounded bg-slate-800/90 border border-slate-700 space-y-0.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-white truncate max-w-[200px]">Oak Avenue Fixture Failure</span>
+                    <span className="gov-chip gov-chip-resolved text-[10px]">Resolved</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">Replacement luminaire installed</p>
+                </div>
+
+                <div className="p-2.5 rounded bg-slate-800/90 border border-slate-700 space-y-0.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-white truncate max-w-[200px]">Pine Street Water Leak</span>
+                    <span className="gov-chip gov-chip-submitted text-[10px]">Submitted</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">Awaiting department triage</p>
+                </div>
               </div>
-              <Link
-                href="/complaints"
-                className="btn-civic-secondary text-xs px-5 py-2.5 w-fit"
-              >
-                View Issues Directory →
-              </Link>
+
+              <div className="pt-1 text-center">
+                <Link href="/complaints" className="text-xs font-semibold text-sky-400 hover:underline">
+                  View Full Municipal Complaint Register →
+                </Link>
+              </div>
             </div>
           </div>
 
         </div>
       </section>
 
-      {/* ── 2. SERVICE CATEGORIES DIRECTORY (CHI311 Grid) ── */}
-      <section className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-slate-200 pb-4 gap-2">
+      {/* ── PLATFORM METRICS BANNER ── */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="gov-card p-4 bg-white border-l-4 border-l-slate-900 border border-slate-200 flex items-center gap-3">
           <div>
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Service Catalog</span>
-            <h2 className="text-2xl font-black text-slate-900">311 Municipal Service Directory</h2>
+            <span className="text-2xl font-black text-slate-900 block leading-none">100%</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 block">Transparent Tracking</span>
           </div>
-          <Link href="/complaints" className="text-xs font-bold text-blue-700 hover:text-blue-900">
-            View All Community Complaints →
+        </div>
+        <div className="gov-card p-4 bg-white border-l-4 border-l-sky-600 border border-slate-200 flex items-center gap-3">
+          <div>
+            <span className="text-2xl font-black text-sky-700 block leading-none">24/7</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 block">Online Submission</span>
+          </div>
+        </div>
+        <div className="gov-card p-4 bg-white border-l-4 border-l-emerald-600 border border-slate-200 flex items-center gap-3">
+          <div>
+            <span className="text-xl font-black text-emerald-700 block leading-none">AI</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 block">Duplicate Detection</span>
+          </div>
+        </div>
+        <div className="gov-card p-4 bg-white border-l-4 border-l-amber-600 border border-slate-200 flex items-center gap-3">
+          <div>
+            <span className="text-xl font-black text-amber-700 block leading-none">GPS</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 block">Field Accuracy</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 1: Municipal Services Categories ── */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <span className="text-xs font-bold text-sky-700 uppercase tracking-wider block">Municipal Services</span>
+            <h2 className="text-xl font-bold text-slate-900">Report a Problem</h2>
+          </div>
+          <Link href="/complaints/create" className="btn-gov-blue text-xs px-3.5 py-1.5 shrink-0">
+            Start New Report →
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {SERVICE_CATEGORIES.map((cat) => (
-            <div
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {ISSUE_CATEGORIES.map((cat) => (
+            <Link
               key={cat.id}
-              className="civic-card p-5 space-y-3 civic-card-hover border-t-2 border-t-[#0a2540] flex flex-col justify-between"
+              href={`/complaints/create?category=${cat.id}`}
+              className="gov-card p-4 gov-card-hover bg-white flex items-start space-x-3.5 group"
             >
-              <div className="space-y-2">
-                <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 text-xl flex items-center justify-center">
-                  {cat.icon}
-                </div>
-                <h3 className="font-bold text-sm text-slate-900">{cat.title}</h3>
-                <p className="text-xs text-slate-600 leading-relaxed">{cat.desc}</p>
+              <div className="p-2.5 rounded bg-slate-50 border border-slate-200 shrink-0 group-hover:bg-sky-50 transition-colors">
+                {cat.icon}
               </div>
+              <div className="space-y-0.5 flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-xs text-slate-900 group-hover:text-sky-700 transition-colors truncate pr-1">
+                    {cat.title}
+                  </h3>
+                  <span className="text-xs text-slate-400 group-hover:text-sky-700">→</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">{cat.desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
 
-              <Link
-                href={`/complaints/create?category=${cat.id}`}
-                className="text-xs font-bold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1 pt-2 border-t border-slate-100"
-              >
-                Report Issue →
-              </Link>
+      {/* ── SECTION 2: How CivicFix Works ── */}
+      <section className="space-y-4">
+        <div className="space-y-0.5">
+          <span className="text-xs font-bold text-sky-700 uppercase tracking-wider block">Structured Workflow</span>
+          <h2 className="text-xl font-bold text-slate-900">How CivicFix Works</h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {HOW_IT_WORKS.map((item) => (
+            <div key={item.step} className="gov-card p-4 space-y-2 bg-white border border-slate-200">
+              <div className="w-7 h-7 rounded bg-[#0f2942] text-white font-bold text-xs flex items-center justify-center">
+                {item.step}
+              </div>
+              <h3 className="font-bold text-xs text-slate-900">{item.title}</h3>
+              <p className="text-[11px] text-slate-600 leading-snug">{item.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── 3. LIVE MUNICIPAL METRICS ── */}
-      <section className="civic-card p-8 bg-white border border-slate-200 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-          <div>
-            <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">City Transparency</span>
-            <h2 className="text-xl font-black text-slate-900">Municipal Service Operational Summary</h2>
-          </div>
-          <span className="text-xs text-slate-500 font-medium">Updated live with 24/7 public audit log</span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
-          <div className="space-y-1 p-4 rounded-lg bg-slate-50 border border-slate-200">
-            <div className="text-3xl font-black text-[#0a2540]">1,420+</div>
-            <div className="text-xs font-bold text-slate-600 uppercase tracking-wider">Total Reports</div>
-          </div>
-          <div className="space-y-1 p-4 rounded-lg bg-emerald-50 border border-emerald-200">
-            <div className="text-3xl font-black text-emerald-800">1,180</div>
-            <div className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Verified Resolved</div>
-          </div>
-          <div className="space-y-1 p-4 rounded-lg bg-amber-50 border border-amber-200">
-            <div className="text-3xl font-black text-amber-800">84</div>
-            <div className="text-xs font-bold text-amber-800 uppercase tracking-wider">Active Workload</div>
-          </div>
-          <div className="space-y-1 p-4 rounded-lg bg-blue-50 border border-blue-200">
-            <div className="text-3xl font-black text-blue-800">24 hrs</div>
-            <div className="text-xs font-bold text-blue-800 uppercase tracking-wider">Avg Dispatch Time</div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 4. HOW 311 WORKS (3-Step Pipeline) ── */}
-      <section className="space-y-6">
-        <div className="text-center max-w-2xl mx-auto space-y-2">
-          <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Simple & Accountable</span>
-          <h2 className="text-2xl font-black text-slate-900">How CivicFix 311 Works</h2>
-          <p className="text-xs text-slate-600">
-            Transparent end-to-end processing from resident submission to worker dispatch and verified repair.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="civic-card p-6 space-y-3 civic-card-blue-top">
-            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-black text-sm flex items-center justify-center">
-              1
-            </div>
-            <h3 className="font-bold text-base text-slate-900">Submit a Service Request</h3>
+      {/* ── SECTION 3: Explore Interactive Map Directory ── */}
+      <section className="gov-card p-6 bg-white border border-slate-200 space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          
+          <div className="lg:col-span-7 space-y-3">
+            <span className="text-xs font-bold text-sky-700 uppercase tracking-wider block">Public Directory</span>
+            <h2 className="text-xl font-bold text-slate-900">
+              Explore Nearby Issues & Community Progress
+            </h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Select a category, pin the issue on the interactive map, and add relevant descriptions or photos. Receive a unique tracking ID immediately.
+              Every complaint registered on CivicFix appears on our municipal interactive map. Search your neighborhood to see pending repairs, active field crew dispatches, and resolved cases.
             </p>
-          </div>
-
-          <div className="civic-card p-6 space-y-3 civic-card-gold-top">
-            <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-900 font-black text-sm flex items-center justify-center">
-              2
+            <div className="pt-1 flex flex-wrap gap-2.5">
+              <Link href="/complaints" className="btn-gov-primary text-xs px-4 py-2">
+                Open Map Directory →
+              </Link>
+              {user ? (
+                <Link href="/dashboard" className="btn-gov-secondary text-xs px-4 py-2">
+                  My Dashboard
+                </Link>
+              ) : (
+                <Link href="/signup" className="btn-gov-secondary text-xs px-4 py-2">
+                  Create Citizen Account
+                </Link>
+              )}
             </div>
-            <h3 className="font-bold text-base text-slate-900">Department Dispatch</h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Requests are automatically routed to responsible municipal departments (Transportation, Water, Sanitation) and assigned to field crews.
-            </p>
           </div>
 
-          <div className="civic-card p-6 space-y-3 civic-card-accent-top">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-900 font-black text-sm flex items-center justify-center">
-              3
+          <div className="lg:col-span-5">
+            <div className="h-44 rounded-lg bg-slate-900 text-white p-4 border border-slate-800 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-sky-400">Map Directory View</span>
+                <span className="text-slate-400 text-[11px]">Metropolitan Area</span>
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-xs text-white">Geographic Issue Clustering</h4>
+                <p className="text-[11px] text-slate-300 leading-snug">
+                  Multiple reports of the same hazard are grouped to prioritize crew dispatches.
+                </p>
+              </div>
+              <div className="flex items-center space-x-1.5 text-[10px] text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Live Location Tracking Active</span>
+              </div>
             </div>
-            <h3 className="font-bold text-base text-slate-900">Verified Resolution</h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Field workers upload resolution evidence notes upon repair completion. Residents verify satisfaction before final issue closure.
-            </p>
           </div>
-        </div>
-      </section>
 
-      {/* ── 5. FINAL CALL TO ACTION ── */}
-      <section className="bg-[#0a2540] text-white rounded-2xl p-8 sm:p-12 text-center space-y-4 shadow-lg border border-slate-700">
-        <h2 className="text-2xl sm:text-4xl font-black tracking-tight">
-          Ready to report a municipal issue?
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto">
-          Help keep streets safe, streetlights working, and neighborhoods clean across our city.
-        </p>
-        <div className="pt-2">
-          <Link
-            href="/complaints/create"
-            className="btn-civic-gold text-sm px-8 py-3.5 shadow-md"
-          >
-            Submit a Service Request →
-          </Link>
         </div>
       </section>
 

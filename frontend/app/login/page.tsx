@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
+import BrandLogo from "../../components/BrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -24,9 +26,9 @@ export default function LoginPage() {
       router.push("/dashboard");
     } catch (err: any) {
       if (err.message?.includes("Incorrect email") || err.message?.includes("401")) {
-        setError("Invalid email or password. Please check your credentials.");
+        setError("Invalid email address or password.");
       } else {
-        setError(err.message || "Unable to sign in. Please try again later.");
+        setError(err.message || "Unable to log in. Please try again.");
       }
     } finally {
       setSubmitting(false);
@@ -34,87 +36,82 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[75vh] grid grid-cols-1 lg:grid-cols-2 rounded-2xl overflow-hidden border border-slate-300 bg-white shadow-xl my-4 animate-fade-in">
-      {/* Left Column: Product Visual & Civic Narrative */}
-      <div className="relative hidden lg:flex flex-col justify-between p-12 bg-[#0a2540] text-white overflow-hidden">
-        <div className="relative z-10 flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-lg bg-[#d97706] text-white font-black text-sm flex items-center justify-center">
-            311
+    <div className="max-w-md mx-auto my-12 px-4 animate-fade-in">
+      <div className="gov-card p-6 sm:p-8 space-y-6 bg-white border border-slate-200 shadow-md">
+        
+        {/* Header Branding */}
+        <div className="space-y-3 text-center">
+          <div className="flex justify-center">
+            <BrandLogo size="md" lightMode={true} showTagline={false} />
           </div>
-          <span className="font-extrabold text-xl tracking-tight text-white">CivicFix 311</span>
-        </div>
-
-        <div className="relative z-10 space-y-4 max-w-md my-auto">
-          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">Official Access</span>
-          <h2 className="text-3xl font-black text-white leading-tight">
-            Keep our city clean, safe, and moving forward.
-          </h2>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Access your personalized 311 portal to track service request status, view field crew assignments, and verify completed infrastructure repairs.
-          </p>
-        </div>
-
-        <div className="relative z-10 pt-6 border-t border-slate-700 flex items-center justify-between text-xs text-slate-400 font-medium">
-          <span>Municipal Service Infrastructure System</span>
-          <span className="text-amber-400 font-mono">v1.0.0</span>
-        </div>
-      </div>
-
-      {/* Right Column: Clean Auth Form */}
-      <div className="p-8 sm:p-12 flex flex-col justify-center space-y-8 bg-white">
-        <div className="space-y-2">
-          <span className="text-xs font-bold text-blue-700 uppercase tracking-wider block">Portal Sign In</span>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900">Sign In to CivicFix 311</h1>
-          <p className="text-xs text-slate-600">Enter your credentials to access your civic account</p>
+          <div className="space-y-0.5">
+            <h1 className="text-xl font-black text-slate-900">Sign In to CivicFix</h1>
+            <p className="text-xs text-slate-600">Official Municipal & Citizen Portal Access</p>
+          </div>
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold space-y-1">
-            <span className="font-bold block">Sign In Failed</span>
+          <div className="p-3.5 rounded bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium space-y-0.5">
+            <span className="font-bold block text-rose-950">Authentication Error</span>
             <p>{error}</p>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Email Address</label>
+          <div className="space-y-1">
+            <label className="gov-label">Email Address</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="input-civic text-xs"
+              placeholder="citizen@example.gov"
+              className="gov-input text-xs"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Password</label>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="gov-label">Password</label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-[11px] text-sky-700 font-semibold hover:underline"
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="input-civic text-xs"
+              className="gov-input text-xs"
             />
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="btn-civic-primary w-full text-xs py-3.5 mt-2"
+            className="btn-gov-primary w-full text-xs py-2.5 mt-1"
           >
-            {submitting ? "Signing In..." : "Sign In to Account →"}
+            {submitting ? "Authenticating..." : "Log In →"}
           </button>
         </form>
 
-        <div className="pt-4 border-t border-slate-200 text-center text-xs text-slate-600">
-          Don&apos;t have an account yet?{" "}
-          <Link href="/register" className="text-blue-700 font-bold hover:underline">
-            Create a Resident Account
-          </Link>
+        <div className="pt-4 border-t border-slate-200 text-center text-xs text-slate-600 space-y-2">
+          <div>
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="text-sky-700 font-bold hover:underline">
+              Register Citizen Account
+            </Link>
+          </div>
+          <div className="text-[11px] text-slate-400">
+            Protected by CivicFix Municipal Security Standards
+          </div>
         </div>
+
       </div>
     </div>
   );

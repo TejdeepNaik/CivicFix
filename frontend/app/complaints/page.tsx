@@ -11,7 +11,18 @@ import {
   Complaint,
   ComplaintCategoryEnum,
   ComplaintStatusEnum,
+  ComplaintPriorityEnum,
 } from "../../lib/types";
+import dynamic from "next/dynamic";
+
+const MapView = dynamic(() => import("../../components/MapView"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-96 w-full rounded-xl bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-500 text-xs animate-pulse">
+      Loading interactive map...
+    </div>
+  ),
+});
 
 export default function ComplaintsDirectoryPage() {
   return (
@@ -43,8 +54,11 @@ function ComplaintsContent() {
 
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [inputValue, setInputValue] = useState<string>("");
+
+  const [viewMode, setViewMode] = useState<"list" | "split">("split");
 
   const pageSize = 12;
 
@@ -55,6 +69,7 @@ function ComplaintsContent() {
       const res = await listComplaintsApi({
         status: statusFilter || undefined,
         category: categoryFilter || undefined,
+        priority: priorityFilter || undefined,
         search: searchTerm || undefined,
         page,
         size: pageSize,
@@ -66,7 +81,7 @@ function ComplaintsContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, categoryFilter, searchTerm]);
+  }, [page, statusFilter, categoryFilter, priorityFilter, searchTerm]);
 
   useEffect(() => {
     fetchComplaints();
@@ -78,52 +93,74 @@ function ComplaintsContent() {
     setPage(1);
   };
 
-  const handleFilterChange = (type: "status" | "category", value: string) => {
+  const handleFilterChange = (type: "status" | "category" | "priority", value: string) => {
     if (type === "status") setStatusFilter(value);
     if (type === "category") setCategoryFilter(value);
+    if (type === "priority") setPriorityFilter(value);
     setPage(1);
   };
 
   const clearFilters = () => {
     setStatusFilter("");
     setCategoryFilter("");
+    setPriorityFilter("");
     setSearchTerm("");
     setInputValue("");
     setPage(1);
   };
 
-  const hasFilters = statusFilter || categoryFilter || searchTerm;
+  const hasFilters = statusFilter || categoryFilter || priorityFilter || searchTerm;
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto py-4 animate-fade-in">
+    <div className="space-y-6 max-w-7xl mx-auto py-4 animate-fade-in">
 
-      {/* ── Page Header ── */}
-      <div className="bg-[#0a2540] text-white p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-md flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-slate-200">
         <div className="space-y-1">
-          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-            Public Audit Log & Directory
+          <span className="text-xs font-bold text-sky-700 uppercase tracking-wider block">
+            Government Public Audit Directory
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            311 Service Requests Directory
+          <h1 className="text-xl font-black text-slate-900">
+            Explore Municipal Complaints & Map
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300">
-            Search, filter, and track public infrastructure complaints across the city.
+          <p className="text-xs sm:text-sm text-slate-600">
+            Search, filter, and inspect reported civic issues across your city.
           </p>
         </div>
 
-        <Link
-          href="/complaints/create"
-          className="btn-civic-gold text-xs px-5 py-2.5 shrink-0 shadow-sm"
-        >
-          + Submit New Request
-        </Link>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center p-1 rounded-lg border border-slate-200 bg-slate-100 text-xs">
+            <button
+              onClick={() => setViewMode("split")}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
+                viewMode === "split" ? "bg-[#0f2942] text-white shadow-xs" : "text-slate-700"
+              }`}
+            >
+              🗺️ Map View
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
+                viewMode === "list" ? "bg-[#0f2942] text-white shadow-xs" : "text-slate-700"
+              }`}
+            >
+              📋 List View
+            </button>
+          </div>
+
+          <Link
+            href="/complaints/create"
+            className="btn-gov-blue text-xs px-4 py-2 shrink-0 shadow-xs"
+          >
+            + Report an Issue
+          </Link>
+        </div>
       </div>
 
-      {/* ── Search & Filter Controls ── */}
-      <div className="civic-card p-4 space-y-3 bg-white">
-        <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-3">
-          {/* Search Input */}
+      {/* Search & Filters Bar */}
+      <div className="gov-card p-4 space-y-3 bg-white border border-slate-200">
+        <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-2.5">
           <div className="relative flex-1">
             <svg
               className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
@@ -136,16 +173,15 @@ function ComplaintsContent() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Search title, location, description, or ID..."
-              className="input-civic pl-10 text-xs"
+              placeholder="Search title, street, description, or reference ID..."
+              className="gov-input pl-10 text-xs"
             />
           </div>
 
-          {/* Select Status */}
           <select
             value={statusFilter}
             onChange={(e) => handleFilterChange("status", e.target.value)}
-            className="input-civic text-xs md:max-w-[170px]"
+            className="gov-input text-xs md:max-w-[150px]"
           >
             <option value="">All Statuses</option>
             {Object.values(ComplaintStatusEnum).map((st) => (
@@ -155,11 +191,10 @@ function ComplaintsContent() {
             ))}
           </select>
 
-          {/* Select Category */}
           <select
             value={categoryFilter}
             onChange={(e) => handleFilterChange("category", e.target.value)}
-            className="input-civic text-xs md:max-w-[170px]"
+            className="gov-input text-xs md:max-w-[150px]"
           >
             <option value="">All Categories</option>
             {Object.values(ComplaintCategoryEnum).map((cat) => (
@@ -169,83 +204,131 @@ function ComplaintsContent() {
             ))}
           </select>
 
-          <button type="submit" className="btn-civic-primary text-xs px-6 py-2.5 shrink-0">
+          <select
+            value={priorityFilter}
+            onChange={(e) => handleFilterChange("priority", e.target.value)}
+            className="gov-input text-xs md:max-w-[140px]"
+          >
+            <option value="">All Priorities</option>
+            {Object.values(ComplaintPriorityEnum).map((p) => (
+              <option key={p} value={p}>
+                {p.toUpperCase()}
+              </option>
+            ))}
+          </select>
+
+          <button type="submit" className="btn-gov-primary text-xs px-5 py-2.5 shrink-0">
             Search
           </button>
         </form>
 
-        {/* Active Filters Pill Row */}
         {hasFilters && (
           <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
-            <span className="text-[11px] font-bold text-slate-500 uppercase">Active filters:</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase">Active:</span>
             {statusFilter && (
               <FilterPill label={`Status: ${statusFilter.replace(/_/g, " ")}`} onRemove={() => handleFilterChange("status", "")} />
             )}
             {categoryFilter && (
               <FilterPill label={`Category: ${categoryFilter.replace(/_/g, " ")}`} onRemove={() => handleFilterChange("category", "")} />
             )}
+            {priorityFilter && (
+              <FilterPill label={`Priority: ${priorityFilter}`} onRemove={() => handleFilterChange("priority", "")} />
+            )}
             {searchTerm && (
               <FilterPill label={`"${searchTerm}"`} onRemove={() => { setSearchTerm(""); setInputValue(""); }} />
             )}
             <button
               onClick={clearFilters}
-              className="text-[11px] text-rose-700 hover:underline ml-1 font-bold"
+              className="text-[11px] text-rose-600 hover:underline ml-1 font-semibold"
             >
-              Clear all filters
+              Clear all
             </button>
           </div>
         )}
       </div>
 
-      {/* ── Results Summary ── */}
-      {!loading && !error && (
-        <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
-          <span>
-            {total === 0
-              ? "No matching requests found"
-              : `Showing ${total} service request${total !== 1 ? "s" : ""}`}
-          </span>
-          {totalPages > 1 && (
-            <span>
-              Page <strong className="text-slate-900">{page}</strong> of{" "}
-              <strong className="text-slate-900">{totalPages}</strong>
-            </span>
+      {/* Main Directory Display Area */}
+      {viewMode === "split" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* Left Column: Complaints List */}
+          <div className="lg:col-span-6 space-y-3">
+            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+              <span>{total} Issue{total !== 1 ? "s" : ""} Found</span>
+              {totalPages > 1 && <span>Page {page} of {totalPages}</span>}
+            </div>
+
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+              </div>
+            ) : error ? (
+              <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold">
+                {error}
+              </div>
+            ) : complaints.length === 0 ? (
+              <EmptyState
+                icon="🔍"
+                title="No matching reports"
+                description="No complaints match your filters."
+                actionLabel="Clear Filters"
+                actionHref="/complaints"
+              />
+            ) : (
+              <div className="space-y-2.5">
+                {complaints.map((c) => (
+                  <ComplaintRow key={c.id} complaint={c} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Interactive Leaflet Map View */}
+          <div className="lg:col-span-6 sticky top-24">
+            <div className="gov-card p-4 space-y-3 bg-white border border-slate-200">
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-200 font-bold text-slate-900">
+                <span>Civic Geographic Location Map</span>
+                <span className="text-sky-700 font-mono text-[11px]">{complaints.length} Pins Loaded</span>
+              </div>
+              <div className="rounded-lg overflow-hidden border border-slate-300">
+                <MapView
+                  latitude={complaints[0]?.latitude || 41.8781}
+                  longitude={complaints[0]?.longitude || -87.6298}
+                  height="h-[520px]"
+                />
+              </div>
+            </div>
+          </div>
+
+        </div>
+      ) : (
+        /* Full Width List View */
+        <div className="space-y-3">
+          {loading ? (
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : error ? (
+            <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs">
+              {error}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {complaints.map((c) => (
+                <ComplaintRow key={c.id} complaint={c} />
+              ))}
+            </div>
           )}
         </div>
       )}
 
-      {/* ── List Rows ── */}
-      {loading ? (
-        <div className="space-y-3">
-          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : error ? (
-        <div className="p-5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-medium">
-          {error}
-        </div>
-      ) : complaints.length === 0 ? (
-        <EmptyState
-          icon="🔍"
-          title="No requests found"
-          description="No civic service requests match your search criteria. Try adjusting your filters or search terms."
-          actionLabel="Clear Filters"
-          actionHref="/complaints"
-        />
-      ) : (
-        <div className="space-y-3">
-          {complaints.map((c) => (
-            <ComplaintRow key={c.id} complaint={c} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Pagination ── */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-4 border-t border-slate-200">
           <button
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
-            className="btn-civic-secondary text-xs px-4 py-2 disabled:opacity-40"
+            className="btn-gov-secondary text-xs px-4 py-2 disabled:opacity-40"
           >
             ← Previous
           </button>
@@ -259,7 +342,7 @@ function ComplaintsContent() {
                   onClick={() => setPage(pg)}
                   className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${
                     pg === page
-                      ? "bg-[#0a2540] text-white"
+                      ? "bg-[#0f2942] text-white"
                       : "text-slate-700 hover:bg-slate-200"
                   }`}
                 >
@@ -272,100 +355,70 @@ function ComplaintsContent() {
           <button
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
-            className="btn-civic-secondary text-xs px-4 py-2 disabled:opacity-40"
+            className="btn-gov-secondary text-xs px-4 py-2 disabled:opacity-40"
           >
             Next →
           </button>
         </div>
       )}
+
     </div>
   );
 }
 
-/* ── Complaint Row Component ── */
 function ComplaintRow({ complaint: c }: { complaint: Complaint }) {
   const icon = CATEGORY_ICONS[c.category] ?? "📋";
-  const timeAgo = formatTimeAgo(c.created_at);
 
   return (
     <Link
       href={`/complaints/${c.id}`}
-      className="group civic-card p-4 hover:border-blue-500 hover:shadow-md transition-all flex items-start gap-4 bg-white"
+      className="group gov-card p-3.5 gov-card-hover flex items-center justify-between gap-3 bg-white border border-slate-200"
     >
-      {/* Category Icon */}
-      <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-xl shrink-0 mt-0.5">
-        {icon}
-      </div>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="w-9 h-9 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-base shrink-0">
+          {icon}
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-700 transition-colors truncate pr-2">
-            {c.title}
-          </h3>
-          <div className="flex items-center gap-2 shrink-0">
-            <PriorityBadge priority={c.priority} />
+        <div className="space-y-0.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-xs text-slate-900 group-hover:text-sky-700 transition-colors truncate">
+              {c.title}
+            </h3>
             <StatusBadge status={c.status} />
+            <PriorityBadge priority={c.priority} />
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-slate-500 truncate">
+            <span className="font-semibold text-slate-700">
+              {c.address || `${c.latitude?.toFixed(3)}, ${c.longitude?.toFixed(3)}`}
+            </span>
+            <span>•</span>
+            <span>{new Date(c.created_at).toLocaleDateString()}</span>
+            <span>•</span>
+            <span className="font-mono text-slate-400">
+              #{c.id.substring(0, 8).toUpperCase()}
+            </span>
           </div>
         </div>
-
-        <p className="text-xs text-slate-600 line-clamp-1 leading-relaxed">
-          {c.description}
-        </p>
-
-        <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-1">
-          <CategoryBadge category={c.category} />
-          <span>•</span>
-          <span className="font-mono text-slate-700 font-bold">
-            #{c.id.substring(0, 8).toUpperCase()}
-          </span>
-          <span>•</span>
-          {(c.address || `${c.latitude?.toFixed(3)}, ${c.longitude?.toFixed(3)}`) && (
-            <>
-              <span className="truncate max-w-[200px] text-slate-700 font-medium">
-                {c.address || `${c.latitude?.toFixed(3)}, ${c.longitude?.toFixed(3)}`}
-              </span>
-              <span>•</span>
-            </>
-          )}
-          <span>{timeAgo}</span>
-        </div>
       </div>
 
-      {/* Arrow */}
-      <svg
-        className="w-4 h-4 text-slate-400 group-hover:text-blue-700 transition-colors shrink-0 mt-2"
-        fill="none" viewBox="0 0 24 24" stroke="currentColor"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-      </svg>
+      <div className="shrink-0 text-xs font-semibold text-sky-700 group-hover:translate-x-0.5 transition-transform">
+        View →
+      </div>
     </Link>
   );
 }
 
 function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-bold">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-sky-50 border border-sky-200 text-sky-900 text-[11px] font-bold">
       {label}
       <button
         onClick={onRemove}
-        className="text-blue-600 hover:text-blue-900 font-black leading-none ml-1"
-        aria-label="Remove filter"
+        className="text-sky-600 hover:text-sky-900 font-black leading-none ml-1"
       >
         ×
       </button>
     </span>
   );
-}
-
-function formatTimeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1)  return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24)  return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
 }
