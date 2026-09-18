@@ -126,6 +126,79 @@ export async function uploadEvidenceApi(file: File): Promise<{ evidence_url: str
   return res.json();
 }
 
+export async function analyzeImageApi(
+  file: File,
+  latitude?: number,
+  longitude?: number
+): Promise<{
+  evidence_url: string;
+  primary_issue: string | null;
+  is_civic_issue: boolean;
+  confidence: number;
+  severity: string;
+  suggested_category: string | null;
+  suggested_department: string | null;
+  reasoning: string;
+  detections: Array<{ label: string; confidence: number; severity: string }>;
+  analysis_available: boolean;
+}> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const query = new URLSearchParams();
+  if (latitude !== undefined && latitude !== null) query.append("latitude", String(latitude));
+  if (longitude !== undefined && longitude !== null) query.append("longitude", String(longitude));
+  const queryString = query.toString();
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}/complaints/analyze-image${queryString ? `?${queryString}` : ""}`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let errorDetail = "Failed to analyze photo evidence";
+    try {
+      const errJson = await res.json();
+      if (errJson.detail) errorDetail = errJson.detail;
+    } catch {}
+    throw new Error(errorDetail);
+  }
+
+  return res.json();
+}
+
+export async function checkDuplicatesApi(payload: {
+  category: string;
+  title: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  evidence_url?: string;
+}): Promise<{
+  is_duplicate_likely: boolean;
+  potential_duplicates: Array<{
+    complaint_id: string;
+    title: string;
+    status: string;
+    category: string;
+    similarity_score: number;
+    distance_meters: number;
+    reasoning_signals: string[];
+  }>;
+}> {
+  return request("/complaints/check-duplicates", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function createComplaintApi(payload: Record<string, any>): Promise<Complaint> {
   return request("/complaints", {
     method: "POST",

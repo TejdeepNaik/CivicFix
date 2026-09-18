@@ -1,83 +1,160 @@
-"""Complaint management API router endpoints."""
+"""Complaints FastAPI API router handling complaint lifecycle operations, evidence uploads, and AI analysis."""
 
-from datetime import datetime, timezone
-from typing import Optional, Set, Dict
+import os
+import uuid
+from typing import Optional, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import func
 
 from ..db.database import get_db
-from ..models.user import User
-from ..models.role import RoleEnum
+from ..core.security import create_access_token
+from .deps import get_current_user
+from ..models.user import User, RoleEnum
 from ..models.complaint import (
     Complaint,
     ComplaintStatusEnum,
     ComplaintPriorityEnum,
     ComplaintCategoryEnum
 )
+from ..models.cluster import IssueCluster
 from ..models.department import Department
 from ..schemas.complaint import (
     ComplaintCreate,
     ComplaintUpdate,
-    ComplaintResolveRequest,
-    ComplaintVerifyRequest,
     ComplaintResponse,
-    ComplaintListResponse
+    ComplaintListResponse,
+    ComplaintResolveRequest,
+    ComplaintVerifyRequest
 )
 from ..schemas.ai import ComplaintAnalysisResponse, DuplicateMatch
 from ..services.ai.factory import get_ai_service
-from ..services.ai.duplicate_detector import find_duplicate_complaints
-from ..services import notifications as notif_svc
-from .deps import get_current_user
+from ..services.ai.duplicate_detector import find_duplicate_complaints, assign_or_create_cluster
+from ..services.notifications import (
+    record_complaint_created,
+    record_complaint_resolved,
+    record_resolution_verified,
+    record_status_changed,
+    record_priority_changed,
+    record_department_assigned,
+    record_worker_assigned,
+)
 
 router = APIRouter()
 
-ADMIN_WORKER_ROLES: Set[RoleEnum] = {
-    RoleEnum.WORKER,
-    RoleEnum.DEPARTMENT_ADMIN,
-    RoleEnum.CITY_ADMIN,
-    RoleEnum.SUPER_ADMIN
-}
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
-# State machine defining permitted complaint status transitions
-VALID_STATUS_TRANSITIONS: Dict[ComplaintStatusEnum, Set[ComplaintStatusEnum]] = {
-    ComplaintStatusEnum.SUBMITTED: {
-        ComplaintStatusEnum.SUBMITTED,
-        ComplaintStatusEnum.UNDER_REVIEW,
-        ComplaintStatusEnum.ASSIGNED,
-        ComplaintStatusEnum.REJECTED
-    },
-    ComplaintStatusEnum.UNDER_REVIEW: {
-        ComplaintStatusEnum.UNDER_REVIEW,
-        ComplaintStatusEnum.ASSIGNED,
-        ComplaintStatusEnum.IN_PROGRESS,
-        ComplaintStatusEnum.REJECTED
-    },
-    ComplaintStatusEnum.ASSIGNED: {
-        ComplaintStatusEnum.ASSIGNED,
-        ComplaintStatusEnum.IN_PROGRESS,
-        ComplaintStatusEnum.RESOLVED,
-        ComplaintStatusEnum.REJECTED
-    },
-    ComplaintStatusEnum.IN_PROGRESS: {
-        ComplaintStatusEnum.IN_PROGRESS,
-        ComplaintStatusEnum.RESOLVED,
-        ComplaintStatusEnum.REJECTED
-    },
-    ComplaintStatusEnum.RESOLVED: {
-        ComplaintStatusEnum.RESOLVED,
-        ComplaintStatusEnum.IN_PROGRESS,  # Rework path
-        ComplaintStatusEnum.CLOSED
-    },
-    ComplaintStatusEnum.REJECTED: {
-        ComplaintStatusEnum.REJECTED,
-        ComplaintStatusEnum.CLOSED
-    },
-    ComplaintStatusEnum.CLOSED: {
-        ComplaintStatusEnum.CLOSED
-    }
-}
+
+@router.post("/upload-evidence", summary="Upload evidence photo")
+def upload_evidence(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload evidence photo with server-side file size and MIME type validation."""
+    if file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only JPEG, PNG, and WebP images are allowed."
+        )
+
+    file_bytes = file.file.read()
+    if len(file_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds 10MB limit."
+        )
+
+    ext = os.path.splitext(file.filename)[1].lower() or ".jpg"
+    filename = f"{uuid.uuid4()}{ext}"
+    upload_dir = os.path.join(os.getcwd(), "uploads", "evidence")
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, filename)
+
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
+
+    evidence_url = f"/static/uploads/evidence/{filename}"
+    return {"evidence_url": evidence_url}
+
+
+class PreSubmissionDuplicateCheckRequest(BaseModel):
+    category: ComplaintCategoryEnum
+    title: str
+    description: str
+    latitude: float
+    longitude: float
+    evidence_url: Optional[str] = None
+
+
+@router.post("/analyze-image", summary="Upload evidence and perform pre-submission vision AI analysis")
+def analyze_image(
+    file: UploadFile = File(...),
+    latitude: Optional[float] = Query(None),
+    longitude: Optional[float] = Query(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload evidence photo, perform AI vision analysis for civic issues, and return evidence URL with structured detection."""
+    if file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only JPEG, PNG, and WebP images are allowed."
+        )
+
+    file_bytes = file.file.read()
+    if len(file_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds 10MB limit."
+        )
+
+    ext = os.path.splitext(file.filename)[1].lower() or ".jpg"
+    filename = f"{uuid.uuid4()}{ext}"
+    upload_dir = os.path.join(os.getcwd(), "uploads", "evidence")
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, filename)
+
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
+
+    evidence_url = f"/static/uploads/evidence/{filename}"
+
+    # Perform AI vision analysis
+    ai_service = get_ai_service()
+    analysis = ai_service.analyze_image_for_civic_issue(
+        image_bytes=file_bytes,
+        content_type=file.content_type,
+        latitude=latitude,
+        longitude=longitude
+    )
+
+    analysis["evidence_url"] = evidence_url
+    return analysis
+
+
+@router.post("/check-duplicates", summary="Check for pre-submission duplicate complaints nearby")
+def check_pre_submission_duplicates(
+    draft: PreSubmissionDuplicateCheckRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Perform pre-submission multi-signal duplicate check using draft location, category, title, description, and photo."""
+    temp_complaint = Complaint(
+        id=str(uuid.uuid4()),
+        citizen_id=current_user.id,
+        title=draft.title,
+        description=draft.description,
+        category=draft.category,
+        priority=ComplaintPriorityEnum.MEDIUM,
+        status=ComplaintStatusEnum.SUBMITTED,
+        latitude=draft.latitude,
+        longitude=draft.longitude,
+        evidence_url=draft.evidence_url
+    )
+    dup_results = find_duplicate_complaints(db=db, target_complaint=temp_complaint)
+    return dup_results
 
 
 @router.post("", response_model=ComplaintResponse, status_code=status.HTTP_201_CREATED, summary="Create a new complaint")
@@ -87,7 +164,7 @@ def create_complaint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> ComplaintResponse:
-    """Create a new civic complaint. Automatically sets status to SUBMITTED and binds to current citizen."""
+    """Create a new civic complaint. Automatically sets status to SUBMITTED, binds to cluster, and triggers priority evaluation."""
     priority_val = complaint_in.priority or ComplaintPriorityEnum.MEDIUM
 
     new_complaint = Complaint(
@@ -99,11 +176,16 @@ def create_complaint(
         status=ComplaintStatusEnum.SUBMITTED,
         latitude=complaint_in.latitude,
         longitude=complaint_in.longitude,
-        address=complaint_in.address
+        address=complaint_in.address,
+        evidence_url=complaint_in.evidence_url
     )
     db.add(new_complaint)
-    db.flush()  # Populate new_complaint.id before activity creation
-    notif_svc.record_complaint_created(db=db, complaint=new_complaint)
+    db.flush()
+
+    # Automatically attach to or create IssueCluster and update priority
+    cluster = assign_or_create_cluster(db, new_complaint)
+
+    record_complaint_created(db=db, complaint=new_complaint)
     db.commit()
     db.refresh(new_complaint)
     return new_complaint
@@ -115,15 +197,14 @@ def get_complaint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> ComplaintResponse:
-    """Retrieve details of a specific complaint. Ordinary citizens can only view their own complaints."""
-    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    """Retrieve details of a specific complaint."""
+    complaint = db.query(Complaint).filter(Complaint.id == str(complaint_id)).first()
     if not complaint:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Complaint not found"
         )
 
-    # Permission check: Citizen can only view their own complaint
     if current_user.role == RoleEnum.CITIZEN and complaint.citizen_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -133,37 +214,42 @@ def get_complaint(
     return complaint
 
 
-@router.get("", response_model=ComplaintListResponse, summary="List and filter complaints")
-@router.get("/", response_model=ComplaintListResponse, include_in_schema=False)
+@router.get("", response_model=ComplaintListResponse, summary="List complaints with filters")
 def list_complaints(
-    status_filter: Optional[ComplaintStatusEnum] = Query(None, alias="status"),
-    priority_filter: Optional[ComplaintPriorityEnum] = Query(None, alias="priority"),
-    category_filter: Optional[ComplaintCategoryEnum] = Query(None, alias="category"),
-    citizen_id_filter: Optional[UUID] = Query(None, alias="citizen_id"),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    status_filter: Optional[ComplaintStatusEnum] = Query(None, alias="status"),
+    category_filter: Optional[ComplaintCategoryEnum] = Query(None, alias="category"),
+    priority_filter: Optional[ComplaintPriorityEnum] = Query(None, alias="priority"),
+    search: Optional[str] = Query(None, description="Search in title, description, or address"),
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100)
 ) -> ComplaintListResponse:
-    """List complaints with filtering and pagination. Citizens are automatically scoped to their own complaints."""
+    """List complaints with filtering and pagination."""
     query = db.query(Complaint)
 
-    # Scoping for ordinary citizens vs authority/admin users
     if current_user.role == RoleEnum.CITIZEN:
         query = query.filter(Complaint.citizen_id == current_user.id)
-    elif citizen_id_filter is not None:
-        query = query.filter(Complaint.citizen_id == citizen_id_filter)
+    elif current_user.role == RoleEnum.WORKER:
+        query = query.filter(Complaint.assigned_worker_id == current_user.id)
 
     if status_filter:
         query = query.filter(Complaint.status == status_filter)
-    if priority_filter:
-        query = query.filter(Complaint.priority == priority_filter)
     if category_filter:
         query = query.filter(Complaint.category == category_filter)
+    if priority_filter:
+        query = query.filter(Complaint.priority == priority_filter)
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            (Complaint.title.ilike(term)) |
+            (Complaint.description.ilike(term)) |
+            (Complaint.address.ilike(term))
+        )
 
     total = query.count()
-    offset = (page - 1) * size
-    items = query.order_by(desc(Complaint.created_at)).offset(offset).limit(size).all()
+    items = query.order_by(Complaint.created_at.desc()).offset((page - 1) * size).limit(size).all()
 
     return ComplaintListResponse(
         items=items,
@@ -173,300 +259,267 @@ def list_complaints(
     )
 
 
-@router.patch("/{complaint_id}", response_model=ComplaintResponse, summary="Update complaint details or status")
+@router.patch("/{complaint_id}", response_model=ComplaintResponse, summary="Update complaint details")
 def update_complaint(
     complaint_id: UUID,
     complaint_in: ComplaintUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> ComplaintResponse:
-    """Update complaint. Citizens can edit fields while status is SUBMITTED; Authorities can update status/priority/worker."""
-    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    """Update complaint details."""
+    complaint = db.query(Complaint).filter(Complaint.id == str(complaint_id)).first()
     if not complaint:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Complaint not found"
         )
 
-    is_admin_or_worker = current_user.role in ADMIN_WORKER_ROLES
-    is_owner = complaint.citizen_id == current_user.id
-
-    if not is_owner and not is_admin_or_worker:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access forbidden: You cannot modify this complaint"
-        )
-
-    # Citizen edit restrictions
-    if current_user.role == RoleEnum.CITIZEN and is_owner:
-        if complaint.status != ComplaintStatusEnum.SUBMITTED:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Citizens can only edit complaints while in SUBMITTED status. Current status is {complaint.status.value}."
-            )
-        # Prevent citizens from modifying administrative fields
-        if complaint_in.status is not None or complaint_in.priority is not None or complaint_in.assigned_worker_id is not None:
+    if current_user.role == RoleEnum.CITIZEN:
+        if str(complaint.citizen_id) != str(current_user.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Citizens are not permitted to change status, priority, or assigned worker."
+                detail="Access forbidden: You can only edit your own complaints"
+            )
+        if (
+            complaint_in.status is not None
+            or complaint_in.priority is not None
+            or complaint_in.assigned_worker_id is not None
+            or complaint_in.department_id is not None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Citizens are not permitted to change status, priority, department, or assigned worker."
+            )
+
+    # Validate department if provided
+    new_dept_obj = None
+    if complaint_in.department_id is not None:
+        new_dept_obj = db.query(Department).filter(Department.id == str(complaint_in.department_id)).first()
+        if not new_dept_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Department not found"
+            )
+
+    # Validate worker if provided
+    new_worker_obj = None
+    if complaint_in.assigned_worker_id is not None:
+        new_worker_obj = db.query(User).filter(User.id == str(complaint_in.assigned_worker_id)).first()
+        if not new_worker_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Worker not found"
+            )
+        if new_worker_obj.role != RoleEnum.WORKER:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Assigned user must have WORKER role"
+            )
+        if not new_worker_obj.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Worker is inactive"
+            )
+        target_dept_id = str(complaint_in.department_id) if complaint_in.department_id is not None else complaint.department_id
+        if target_dept_id and new_worker_obj.department_id and str(new_worker_obj.department_id) != str(target_dept_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Worker does not belong to complaint department"
+            )
+
+    # Check department change effect on existing assigned worker
+    if complaint_in.department_id is not None and str(complaint_in.department_id) != str(complaint.department_id):
+        if complaint.assigned_worker_id and complaint_in.assigned_worker_id is None:
+            existing_worker = db.query(User).filter(User.id == str(complaint.assigned_worker_id)).first()
+            if existing_worker and existing_worker.department_id and str(existing_worker.department_id) != str(complaint_in.department_id):
+                complaint.assigned_worker_id = None
+
+    # Preserve old values for change detection
+    old_status = complaint.status
+    old_priority = complaint.priority
+    old_department_id = complaint.department_id
+    old_worker_id = complaint.assigned_worker_id
+
+    # Validate status transition if status provided
+    allowed_transitions = {
+        ComplaintStatusEnum.SUBMITTED: {ComplaintStatusEnum.UNDER_REVIEW, ComplaintStatusEnum.ASSIGNED, ComplaintStatusEnum.REJECTED},
+        ComplaintStatusEnum.UNDER_REVIEW: {ComplaintStatusEnum.ASSIGNED, ComplaintStatusEnum.IN_PROGRESS, ComplaintStatusEnum.REJECTED},
+        ComplaintStatusEnum.ASSIGNED: {ComplaintStatusEnum.IN_PROGRESS, ComplaintStatusEnum.RESOLVED, ComplaintStatusEnum.REJECTED},
+        ComplaintStatusEnum.IN_PROGRESS: {ComplaintStatusEnum.RESOLVED, ComplaintStatusEnum.REJECTED},
+        ComplaintStatusEnum.RESOLVED: {ComplaintStatusEnum.CLOSED, ComplaintStatusEnum.IN_PROGRESS},
+        ComplaintStatusEnum.REJECTED: set(),
+        ComplaintStatusEnum.CLOSED: set(),
+    }
+    if complaint_in.status is not None and complaint_in.status != old_status:
+        if old_status not in allowed_transitions or complaint_in.status not in allowed_transitions[old_status]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status transition from {old_status} to {complaint_in.status}"
             )
 
     update_data = complaint_in.model_dump(exclude_unset=True)
-
-    # 1. Validate status transition rules
-    if "status" in update_data and update_data["status"] is not None:
-        target_status = update_data["status"]
-        if target_status != complaint.status:
-            allowed_next_statuses = VALID_STATUS_TRANSITIONS.get(complaint.status, set())
-            if target_status not in allowed_next_statuses:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid status transition from {complaint.status.value} to {target_status.value}"
-                )
-
-    # 2. Handle department routing (admin-only field)
-    if "department_id" in update_data:
-        if not is_admin_or_worker:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Citizens cannot change the department routing of a complaint"
-            )
-        new_dept_id = update_data["department_id"]
-        if new_dept_id is not None:
-            dept = db.query(Department).filter(Department.id == new_dept_id).first()
-            if not dept:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Department not found"
-                )
-            # If department changes while a worker from a different department is assigned,
-            # clear the worker assignment to prevent cross-department inconsistency.
-            if (
-                complaint.assigned_worker_id is not None
-                and "assigned_worker_id" not in update_data
-            ):
-                existing_worker = db.query(User).filter(
-                    User.id == complaint.assigned_worker_id
-                ).first()
-                if existing_worker and existing_worker.department_id != new_dept_id:
-                    complaint.assigned_worker_id = None
-                    complaint.assigned_at = None
-            # Capture dept names for activity before changing
-            old_dept = None
-            if complaint.department_id is not None:
-                old_dept_obj = db.query(Department).filter(
-                    Department.id == complaint.department_id
-                ).first()
-                old_dept = old_dept_obj.name if old_dept_obj else None
-            new_dept_name = dept.name
-        complaint.department_id = new_dept_id
-        del update_data["department_id"]
-        if new_dept_id is not None:
-            notif_svc.record_department_assigned(
-                db=db,
-                complaint=complaint,
-                actor_id=current_user.id,
-                old_dept_name=old_dept,
-                new_dept_name=new_dept_name,
-            )
-
-    # 3. Handle worker assignment logic if assigned_worker_id is specified
-    if "assigned_worker_id" in update_data:
-        worker_id = update_data["assigned_worker_id"]
-        old_worker_name: Optional[str] = None
-        if complaint.assigned_worker_id is not None:
-            old_w = db.query(User).filter(User.id == complaint.assigned_worker_id).first()
-            old_worker_name = old_w.full_name or old_w.email if old_w else None
-        if worker_id is None:
-            notif_svc.record_worker_assigned(
-                db=db, complaint=complaint, actor_id=current_user.id,
-                old_worker_name=old_worker_name, new_worker_name=None, new_worker_id=None
-            )
-            complaint.assigned_worker_id = None
-            complaint.assigned_at = None
-        else:
-            worker_user = db.query(User).filter(User.id == worker_id).first()
-            if not worker_user:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Assigned worker user does not exist"
-                )
-            if worker_user.role != RoleEnum.WORKER:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Assigned user must have WORKER role, got {worker_user.role.value}"
-                )
-            if not worker_user.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot assign an inactive worker"
-                )
-            # Enforce worker-department membership when the complaint has a department
-            effective_dept_id = complaint.department_id
-            if effective_dept_id is not None:
-                if worker_user.department_id != effective_dept_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Worker does not belong to the complaint's department"
-                    )
-            new_worker_name = worker_user.full_name or worker_user.email
-            notif_svc.record_worker_assigned(
-                db=db, complaint=complaint, actor_id=current_user.id,
-                old_worker_name=old_worker_name, new_worker_name=new_worker_name,
-                new_worker_id=worker_id
-            )
-            complaint.assigned_worker_id = worker_id
-            complaint.assigned_at = datetime.now(timezone.utc)
-            # If status was SUBMITTED, automatically transition to ASSIGNED unless status was explicitly set
-            if complaint.status == ComplaintStatusEnum.SUBMITTED and "status" not in update_data:
-                complaint.status = ComplaintStatusEnum.ASSIGNED
-
-    # 4. Apply remaining field updates with activity tracking
-    old_status = complaint.status
-    old_priority = complaint.priority
     for field, value in update_data.items():
-        if field not in ("assigned_worker_id", "department_id"):  # Handled above
-            setattr(complaint, field, value)
+        if value is not None and isinstance(value, UUID):
+            value = str(value)
+        setattr(complaint, field, value)
 
-    # Record status change activity (if status actually changed)
-    if "status" in update_data and update_data["status"] is not None:
-        new_status = update_data["status"]
-        if new_status != old_status:
-            notif_svc.record_status_changed(
-                db=db, complaint=complaint, actor_id=current_user.id,
-                old_status=old_status.value, new_status=new_status.value
-            )
+    # Auto transition to ASSIGNED when worker assigned if submitted or under review
+    if complaint_in.assigned_worker_id is not None and complaint.status in {ComplaintStatusEnum.SUBMITTED, ComplaintStatusEnum.UNDER_REVIEW}:
+        complaint.status = ComplaintStatusEnum.ASSIGNED
+        complaint.assigned_at = func.now()
 
-    # Record priority change activity (if priority actually changed)
-    if "priority" in update_data and update_data["priority"] is not None:
-        new_priority = update_data["priority"]
-        if new_priority != old_priority:
-            notif_svc.record_priority_changed(
-                db=db, complaint=complaint, actor_id=current_user.id,
-                old_priority=old_priority.value, new_priority=new_priority.value
-            )
+    # Handle status change
+    if complaint_in.status is not None and old_status != complaint.status:
+        record_status_changed(
+            db=db,
+            complaint=complaint,
+            actor_id=current_user.id,
+            old_status=old_status.value if hasattr(old_status, "value") else str(old_status),
+            new_status=complaint.status.value if hasattr(complaint.status, "value") else str(complaint.status),
+        )
+
+    # Handle priority change
+    if complaint_in.priority is not None and old_priority != complaint.priority:
+        record_priority_changed(
+            db=db,
+            complaint=complaint,
+            actor_id=current_user.id,
+            old_priority=old_priority.value if hasattr(old_priority, "value") else str(old_priority),
+            new_priority=complaint.priority.value if hasattr(complaint.priority, "value") else str(complaint.priority),
+        )
+
+    # Handle department assignment/change
+    if complaint_in.department_id is not None and old_department_id != complaint.department_id:
+        old_dept = db.query(Department).filter(Department.id == str(old_department_id)).first() if old_department_id else None
+        record_department_assigned(
+            db=db,
+            complaint=complaint,
+            actor_id=current_user.id,
+            old_dept_name=old_dept.name if old_dept else None,
+            new_dept_name=new_dept_obj.name if new_dept_obj else None,
+        )
+
+    # Handle worker assignment/unassignment
+    if complaint_in.assigned_worker_id is not None and old_worker_id != complaint.assigned_worker_id:
+        old_worker = db.query(User).filter(User.id == str(old_worker_id)).first() if old_worker_id else None
+        record_worker_assigned(
+            db=db,
+            complaint=complaint,
+            actor_id=current_user.id,
+            old_worker_name=old_worker.full_name if old_worker else None,
+            new_worker_name=new_worker_obj.full_name if new_worker_obj else None,
+            new_worker_id=str(new_worker_obj.id) if new_worker_obj else None,
+        )
+        if complaint.assigned_worker_id:
+            complaint.assigned_at = func.now()
 
     db.commit()
     db.refresh(complaint)
     return complaint
 
 
-@router.post("/{complaint_id}/resolve", response_model=ComplaintResponse, summary="Mark complaint as resolved with evidence")
+@router.post("/{complaint_id}/resolve", response_model=ComplaintResponse, summary="Mark complaint as resolved")
 def resolve_complaint(
     complaint_id: UUID,
     resolve_in: ComplaintResolveRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> ComplaintResponse:
-    """Mark a complaint as RESOLVED with resolution notes and optional evidence. Restricted to assigned worker or Admin."""
-    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    """Mark complaint as RESOLVED with resolution notes and evidence."""
+    complaint = db.query(Complaint).filter(Complaint.id == str(complaint_id)).first()
     if not complaint:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Complaint not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found")
 
-    # Permission check: Assigned worker or Admin role required
-    is_admin = current_user.role in {RoleEnum.DEPARTMENT_ADMIN, RoleEnum.CITY_ADMIN, RoleEnum.SUPER_ADMIN}
-    is_assigned_worker = complaint.assigned_worker_id == current_user.id
+    if current_user.role == RoleEnum.CITIZEN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Citizens are not permitted to resolve complaints")
 
-    if not is_assigned_worker and not is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access forbidden: Only the assigned worker or an admin can resolve this complaint"
-        )
+    # Ensure only assigned worker can resolve and status is appropriate
+    if complaint.status not in {ComplaintStatusEnum.ASSIGNED, ComplaintStatusEnum.IN_PROGRESS}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot resolve complaint in its current status")
+    if current_user.role == RoleEnum.WORKER and str(complaint.assigned_worker_id) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only assigned worker can resolve")
 
-    # Status check: Must be ASSIGNED or IN_PROGRESS (or RESOLVED if updating resolution details)
-    if complaint.status not in {ComplaintStatusEnum.ASSIGNED, ComplaintStatusEnum.IN_PROGRESS, ComplaintStatusEnum.RESOLVED}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot resolve complaint in status {complaint.status.value}. Must be ASSIGNED or IN_PROGRESS."
-        )
-
+    old_status = complaint.status
     complaint.status = ComplaintStatusEnum.RESOLVED
     complaint.resolution_notes = resolve_in.resolution_notes
-    complaint.resolution_evidence = resolve_in.resolution_evidence
-    complaint.resolved_at = datetime.now(timezone.utc)
+    if resolve_in.resolution_evidence:
+        complaint.resolution_evidence = resolve_in.resolution_evidence
+    complaint.resolved_at = func.now()
     complaint.resolved_by_id = current_user.id
 
-    notif_svc.record_complaint_resolved(db=db, complaint=complaint, actor_id=current_user.id)
+    # Record status change activity and notification
+    record_status_changed(
+        db=db,
+        complaint=complaint,
+        actor_id=current_user.id,
+        old_status=old_status.value if hasattr(old_status, "value") else str(old_status),
+        new_status=complaint.status.value if hasattr(complaint.status, "value") else str(complaint.status),
+    )
+    record_complaint_resolved(db=db, complaint=complaint, actor_id=current_user.id)
     db.commit()
     db.refresh(complaint)
     return complaint
 
 
-@router.post("/{complaint_id}/verify", response_model=ComplaintResponse, summary="Citizen verification of complaint resolution")
+@router.post("/{complaint_id}/verify", response_model=ComplaintResponse, summary="Verify complaint resolution")
 def verify_complaint(
     complaint_id: UUID,
     verify_in: ComplaintVerifyRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> ComplaintResponse:
-    """Citizen verification of resolution. Accepting transitions to CLOSED; rejecting reopens to IN_PROGRESS for rework."""
-    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    """Verify complaint resolution."""
+    complaint = db.query(Complaint).filter(Complaint.id == str(complaint_id)).first()
     if not complaint:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Complaint not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found")
 
-    # Permission check: Only citizen owner can verify
-    if complaint.citizen_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access forbidden: Only the citizen who reported this complaint can verify its resolution"
-        )
+    if current_user.role == RoleEnum.CITIZEN and str(complaint.citizen_id) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access forbidden")
 
-    # Status check: Must be RESOLVED
-    if complaint.status != ComplaintStatusEnum.RESOLVED:
+    if complaint.status != ComplaintStatusEnum.RESOLVED or complaint.is_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Complaint must be in RESOLVED status to verify. Current status is {complaint.status.value}."
+            detail="Only RESOLVED complaints can be verified, and already verified or closed complaints cannot be re-verified"
         )
 
-    # Prevent duplicate verification if already verified and CLOSED
-    if complaint.is_verified and complaint.status == ComplaintStatusEnum.CLOSED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Complaint resolution has already been verified and closed"
-        )
-
-    complaint.verified_at = datetime.now(timezone.utc)
+    complaint.is_satisfied = verify_in.is_satisfied
     complaint.feedback_notes = verify_in.feedback_notes
+    complaint.verified_at = func.now()
 
+    old_status = complaint.status
     if verify_in.is_satisfied:
         complaint.is_verified = True
-        complaint.is_satisfied = True
         complaint.status = ComplaintStatusEnum.CLOSED
     else:
-        # Citizen rejected resolution -> reopen for rework
         complaint.is_verified = False
-        complaint.is_satisfied = False
         complaint.status = ComplaintStatusEnum.IN_PROGRESS
 
-    notif_svc.record_resolution_verified(
-        db=db, complaint=complaint, actor_id=current_user.id, is_satisfied=verify_in.is_satisfied
-    )
+    # Record status change if any
+    if old_status != complaint.status:
+        record_status_changed(
+            db=db,
+            complaint=complaint,
+            actor_id=current_user.id,
+            old_status=old_status.value if hasattr(old_status, "value") else str(old_status),
+            new_status=complaint.status.value if hasattr(complaint.status, "value") else str(complaint.status),
+        )
+    record_resolution_verified(db=db, complaint=complaint, actor_id=current_user.id, is_satisfied=verify_in.is_satisfied)
     db.commit()
     db.refresh(complaint)
     return complaint
 
 
-@router.post("/{complaint_id}/analyze", response_model=ComplaintAnalysisResponse, summary="Perform AI analysis and duplicate detection")
+@router.post("/{complaint_id}/analyze", response_model=ComplaintAnalysisResponse, summary="Perform AI analysis, multi-signal duplicate detection, and cluster evaluation")
 def analyze_complaint(
     complaint_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> ComplaintAnalysisResponse:
-    """Analyze a complaint using AI services: category/priority suggestions, AI summary, and pgvector duplicate detection."""
-    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    """Analyze a complaint using AI services, multi-signal (text+image+geo) pgvector similarity, and persistent issue cluster evaluation."""
+    complaint = db.query(Complaint).filter(Complaint.id == str(complaint_id)).first()
     if not complaint:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Complaint not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found")
 
-    # Permission check: Citizens can only analyze their own complaint
     if current_user.role == RoleEnum.CITIZEN and complaint.citizen_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -474,12 +527,10 @@ def analyze_complaint(
         )
 
     ai_service = get_ai_service()
-
-    # Get AI suggestions
     ai_suggestions = ai_service.suggest_category_and_priority(complaint.title, complaint.description)
     ai_summary = ai_service.generate_summary(complaint.title, complaint.description)
 
-    # Perform duplicate detection
+    # Perform multi-signal duplicate detection and cluster assignment
     dup_results = find_duplicate_complaints(db=db, target_complaint=complaint)
 
     potential_dups = [
@@ -489,13 +540,21 @@ def analyze_complaint(
             status=item["status"],
             category=item["category"],
             similarity_score=item["similarity_score"],
-            distance_meters=item["distance_meters"]
+            text_similarity=item.get("text_similarity"),
+            image_similarity=item.get("image_similarity"),
+            distance_meters=item["distance_meters"],
+            reasoning_signals=item.get("reasoning_signals", [])
         )
         for item in dup_results["potential_duplicates"]
     ]
 
+    cluster_priority_enum = ComplaintPriorityEnum(dup_results["cluster_priority"]) if dup_results.get("cluster_priority") in [p.value for p in ComplaintPriorityEnum] else ai_suggestions["suggested_priority"]
+
     return ComplaintAnalysisResponse(
         complaint_id=complaint.id,
+        cluster_id=UUID(dup_results["cluster_id"]) if dup_results.get("cluster_id") else complaint.cluster_id,
+        cluster_report_count=dup_results.get("cluster_report_count", 1),
+        cluster_priority=cluster_priority_enum,
         suggested_category=ai_suggestions["suggested_category"],
         suggested_priority=ai_suggestions["suggested_priority"],
         summary=ai_summary,
