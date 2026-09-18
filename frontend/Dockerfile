@@ -4,8 +4,8 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Copy package manifests only for layer caching
-COPY frontend/package.json frontend/package-lock.json ./
+# Copy package manifests for layer caching (supports both root and frontend build contexts)
+COPY package.json* package-lock.json* frontend/package.json* frontend/package-lock.json* ./
 RUN npm ci
 
 # ── Stage 2: builder ───────────────────────────────────────────────────────
@@ -15,8 +15,10 @@ WORKDIR /app
 # Copy deps from previous stage
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy all frontend source
+# Copy frontend source (supports both root and frontend build contexts)
+COPY . ./
 COPY frontend/ ./
+
 
 # NEXT_PUBLIC_API_URL is a build-time variable for the Next.js client bundle.
 ARG NEXT_PUBLIC_API_URL
