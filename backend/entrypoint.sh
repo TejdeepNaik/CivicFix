@@ -31,16 +31,19 @@ EOF
 
 echo "[entrypoint] Applying Alembic migrations..."
 # Run alembic upgrade head.
-# If it fails, log the error but do NOT stop startup — the DB may already be
-# at the correct revision from a previous successful run.
+# On failure: log clearly and continue startup.
+# IMPORTANT: Do NOT stamp head on failure — stamping marks a failed migration
+# as complete which would cause future deploys to skip it, leaving the schema
+# permanently broken. Let Alembic retry the same revision on the next deploy.
 if alembic upgrade head; then
     echo "[entrypoint] Alembic migrations applied successfully."
+    alembic current 2>/dev/null || true
 else
-    echo "[entrypoint] WARNING: Alembic upgrade head reported an error (exit $?)."
-    echo "[entrypoint] Attempting alembic stamp to recover from partial migration..."
-    # Stamp to head so the next deploy can progress from a clean state.
-    alembic stamp head 2>/dev/null || true
-    echo "[entrypoint] Continuing startup despite migration warning..."
+    MIGRATION_EXIT=$?
+    echo "[entrypoint] ERROR: Alembic upgrade head failed (exit ${MIGRATION_EXIT})."
+    echo "[entrypoint] Current Alembic revision:"
+    alembic current 2>/dev/null || true
+    echo "[entrypoint] Continuing startup — application may be degraded if schema is incomplete."
 fi
 
 echo "[entrypoint] Starting Uvicorn..."
