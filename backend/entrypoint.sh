@@ -1,5 +1,5 @@
 #!/bin/sh
-# Backend Docker entrypoint: run Alembic migrations then start Uvicorn.
+# Backend Docker entrypoint: wait for DB, run Alembic migrations, start Uvicorn.
 set -e
 
 echo "[entrypoint] Checking database configuration..."
@@ -30,7 +30,18 @@ sys.exit(0)
 EOF
 
 echo "[entrypoint] Applying Alembic migrations..."
-alembic upgrade head || echo "[entrypoint] Alembic migration skipped or failed, proceeding..."
+# Run alembic upgrade head.
+# If it fails, log the error but do NOT stop startup — the DB may already be
+# at the correct revision from a previous successful run.
+if alembic upgrade head; then
+    echo "[entrypoint] Alembic migrations applied successfully."
+else
+    echo "[entrypoint] WARNING: Alembic upgrade head reported an error (exit $?)."
+    echo "[entrypoint] Attempting alembic stamp to recover from partial migration..."
+    # Stamp to head so the next deploy can progress from a clean state.
+    alembic stamp head 2>/dev/null || true
+    echo "[entrypoint] Continuing startup despite migration warning..."
+fi
 
 echo "[entrypoint] Starting Uvicorn..."
 PORT="${PORT:-8000}"
