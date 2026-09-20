@@ -30,7 +30,7 @@ def list_notifications(
     current_user: User = Depends(get_current_user),
 ) -> NotificationListResponse:
     """Return paginated list of notifications for the authenticated user."""
-    query = db.query(Notification).filter(Notification.recipient_id == current_user.id)
+    query = db.query(Notification).filter(Notification.recipient_id == str(current_user.id))
     if unread_only:
         query = query.filter(Notification.is_read == False)  # noqa: E712
     query = query.order_by(desc(Notification.created_at))
@@ -59,10 +59,10 @@ def mark_notification_read_endpoint(
     - Returns **403** if the notification belongs to a different user.
     - Idempotent: marking an already-read notification has no effect.
     """
-    notification = db.query(Notification).filter(Notification.id == notification_id).first()
+    notification = db.query(Notification).filter(Notification.id == str(notification_id)).first()
     if not notification:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
-    if notification.recipient_id != current_user.id:
+    if str(notification.recipient_id) != str(current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access forbidden: This notification belongs to another user",
@@ -86,7 +86,7 @@ def mark_all_notifications_read(
     now = datetime.now(timezone.utc)
     updated = (
         db.query(Notification)
-        .filter(Notification.recipient_id == current_user.id, Notification.is_read == False)  # noqa: E712
+        .filter(Notification.recipient_id == str(current_user.id), Notification.is_read == False)  # noqa: E712
         .update({"is_read": True, "read_at": now}, synchronize_session="fetch")
     )
     db.commit()

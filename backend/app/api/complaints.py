@@ -5,7 +5,7 @@ import uuid
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Form, status, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -94,6 +94,7 @@ def analyze_image(
     file: UploadFile = File(...),
     latitude: Optional[float] = Query(None),
     longitude: Optional[float] = Query(None),
+    user_context: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user)
 ):
     """Upload evidence photo, perform AI vision analysis for civic issues, and return evidence URL with structured detection."""
@@ -127,7 +128,8 @@ def analyze_image(
         image_bytes=file_bytes,
         content_type=file.content_type,
         latitude=latitude,
-        longitude=longitude
+        longitude=longitude,
+        user_context=user_context
     )
 
     analysis["evidence_url"] = evidence_url

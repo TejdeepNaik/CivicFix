@@ -129,7 +129,8 @@ export async function uploadEvidenceApi(file: File): Promise<{ evidence_url: str
 export async function analyzeImageApi(
   file: File,
   latitude?: number,
-  longitude?: number
+  longitude?: number,
+  userContext?: string
 ): Promise<{
   evidence_url: string;
   primary_issue: string | null;
@@ -145,6 +146,9 @@ export async function analyzeImageApi(
   const token = getToken();
   const formData = new FormData();
   formData.append("file", file);
+  if (userContext && userContext.trim()) {
+    formData.append("user_context", userContext.trim());
+  }
 
   const query = new URLSearchParams();
   if (latitude !== undefined && latitude !== null) query.append("latitude", String(latitude));

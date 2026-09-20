@@ -10,7 +10,7 @@ from ..db.base import Base
 class Department(Base):
     __tablename__ = "departments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(100), unique=True, nullable=False, index=True)
     code = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(Text, nullable=True)

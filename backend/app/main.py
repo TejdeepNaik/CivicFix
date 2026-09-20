@@ -1,11 +1,13 @@
 """FastAPI application entry point.
 
 This module initializes the FastAPI app instance, configures CORS middleware,
-and mounts API routers under /api/v1 as well as root health endpoints.
+mounts static uploads directory, and mounts API routers under /api/v1 as well as root health endpoints.
 """
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .core.config import settings
 from .api import api_router
@@ -18,6 +20,13 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Ensure uploads evidence directory exists
+upload_dir = os.path.join(os.getcwd(), "uploads", "evidence")
+os.makedirs(upload_dir, exist_ok=True)
+
+# Mount static uploads directory for serving complaint evidence photos
+app.mount("/static/uploads", StaticFiles(directory="uploads"), name="static_uploads")
 
 # Configure CORS middleware for frontend communication
 app.add_middleware(

@@ -18,6 +18,7 @@ class ComplaintBase(BaseModel):
     latitude: float = Field(..., ge=-90.0, le=90.0, description="Latitude between -90 and 90")
     longitude: float = Field(..., ge=-180.0, le=180.0, description="Longitude between -180 and 180")
     address: Optional[str] = Field(None, max_length=500, description="Optional street address / location text")
+    evidence_url: Optional[str] = Field(None, max_length=500, description="Optional evidence photo URL/path")
 
 
 class ComplaintCreate(ComplaintBase):
@@ -35,6 +36,7 @@ class ComplaintUpdate(BaseModel):
     latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
     longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
     address: Optional[str] = Field(None, max_length=500)
+    evidence_url: Optional[str] = Field(None, max_length=500)
 
 
 class ComplaintResolveRequest(BaseModel):
@@ -52,6 +54,7 @@ class ComplaintResponse(ComplaintBase):
     citizen_id: UUID
     assigned_worker_id: Optional[UUID] = None
     department_id: Optional[UUID] = None
+    cluster_id: Optional[UUID] = None
     status: ComplaintStatusEnum
     priority: ComplaintPriorityEnum
     assigned_at: Optional[datetime] = None

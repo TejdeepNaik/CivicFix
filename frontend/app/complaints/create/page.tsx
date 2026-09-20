@@ -64,21 +64,24 @@ function CreateComplaintWizard() {
   const searchParams = useSearchParams();
   const preselectedCategory = searchParams?.get("category");
 
-  // Flow Mode & Step
-  const [mode, setMode] = useState<"camera" | "manual" | "review">("camera");
+  // Flow Mode & Step: "camera" (landing) -> "preview" -> "review" (after AI analysis) or "manual"
+  const [mode, setMode] = useState<"camera" | "preview" | "manual" | "review">("camera");
 
   // Photo & AI Analysis State
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [evidenceUrl, setEvidenceUrl] = useState<string | null>(null);
+  const [userContext, setUserContext] = useState<string>("");
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const duplicateCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [isAiConfident, setIsAiConfident] = useState<boolean>(true);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
+  const [aiPrimaryIssue, setAiPrimaryIssue] = useState<string | null>(null);
 
   // Form Fields
   const [category, setCategory] = useState<ComplaintCategoryEnum>(
@@ -102,6 +105,7 @@ function CreateComplaintWizard() {
   // Voice Input State
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [voiceTarget, setVoiceTarget] = useState<"context" | "description">("context");
 
   // UI State
   const [showEditFields, setShowEditFields] = useState(false);
@@ -143,8 +147,16 @@ function CreateComplaintWizard() {
     if (addr) setAddress(addr);
   };
 
-  // Handle Image Capture & AI Processing
-  const handlePhotoCaptured = async (file: File) => {
+  // Step 1: File selection -> Photo Preview
+  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Invalid file type. Please select or take a photo image.");
+      return;
+    }
+
     if (file.size > 10 * 1024 * 1024) {
       setError("Image size exceeds 10MB limit. Please select a smaller photo.");
       return;
@@ -153,22 +165,39 @@ function CreateComplaintWizard() {
     setError(null);
     setImageFile(file);
 
-    // Generate local preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
 
-    // Trigger AI Vision Analysis
-    setAnalyzingImage(true);
-    try {
-      const analysis = await analyzeImageApi(file, latitude, longitude);
-      setEvidenceUrl(analysis.evidence_url);
+    // Transition to Photo Preview step (Do not submit immediately!)
+    setMode("preview");
+  };
 
+  // Step 2: "Use This Photo" -> Trigger AI Vision Analysis
+  const confirmAndAnalyzePhoto = async () => {
+    if (!imageFile) {
+      setError("No photo selected. Please take or select a photo first.");
+      return;
+    }
+
+    setError(null);
+    setAnalyzingImage(true);
+
+    try {
+      const analysis = await analyzeImageApi(
+        imageFile,
+        latitude,
+        longitude,
+        userContext.trim() || undefined
+      );
+
+      setEvidenceUrl(analysis.evidence_url);
       const conf = analysis.confidence || 0;
       setAiConfidence(conf);
       setAiReasoning(analysis.reasoning || null);
+      setAiPrimaryIssue(analysis.primary_issue || null);
 
       if (conf >= 0.60 && analysis.is_civic_issue) {
         setIsAiConfident(true);
@@ -193,34 +222,33 @@ function CreateComplaintWizard() {
         // Map Title & Description
         const defaultTitle = analysis.primary_issue || "Reported Civic Infrastructure Issue";
         setTitle(defaultTitle);
-        setDescription(
-          analysis.reasoning ||
-            `Observed civic infrastructure issue requiring municipal inspection.`
-        );
+
+        let descText = analysis.reasoning || `Observed civic infrastructure issue requiring municipal inspection.`;
+        if (userContext.trim()) {
+          descText = `${userContext.trim()}\n\nAI Analysis Note: ${descText}`;
+        }
+        setDescription(descText);
       } else {
         setIsAiConfident(false);
         setShowEditFields(true);
-        setTitle("Civic Infrastructure Issue");
-        setDescription("");
+        setTitle(analysis.primary_issue || "Civic Infrastructure Issue");
+        setDescription(userContext.trim() || "");
       }
 
       setMode("review");
+      if (title.trim() && description.trim()) {
+        runDuplicateCheck(title, description, category);
+      }
     } catch (err: any) {
       console.warn("Vision analysis failed, proceeding with manual details:", err);
       setIsAiConfident(false);
       setShowEditFields(true);
       setTitle("Civic Infrastructure Issue");
-      setDescription("");
+      setDescription(userContext.trim() || "");
+      setError("AI analysis was unavailable. Please review and fill in the details manually.");
       setMode("review");
     } finally {
       setAnalyzingImage(false);
-    }
-  };
-
-  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handlePhotoCaptured(file);
     }
   };
 
@@ -228,17 +256,20 @@ function CreateComplaintWizard() {
     setImageFile(null);
     setImagePreview(null);
     setEvidenceUrl(null);
+    setUserContext("");
     setAiConfidence(null);
     setAiReasoning(null);
+    setAiPrimaryIssue(null);
     setIsAiConfident(true);
     setShowEditFields(false);
+    setError(null);
     setMode("camera");
     if (cameraInputRef.current) cameraInputRef.current.value = "";
     if (galleryInputRef.current) galleryInputRef.current.value = "";
   };
 
-  // Voice Input Handler
-  const toggleVoiceDictation = () => {
+  // Voice Input Handler (supports either context or description target)
+  const toggleVoiceDictation = (target: "context" | "description") => {
     if (!speechSupported) return;
 
     const SpeechRecognition =
@@ -256,6 +287,7 @@ function CreateComplaintWizard() {
       recognition.interimResults = false;
       recognition.lang = "en-US";
 
+      setVoiceTarget(target);
       recognition.onstart = () => {
         setIsListening(true);
       };
@@ -263,7 +295,11 @@ function CreateComplaintWizard() {
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         if (transcript) {
-          setDescription((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          if (target === "context") {
+            setUserContext((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          } else {
+            setDescription((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          }
         }
         setIsListening(false);
       };
@@ -283,33 +319,38 @@ function CreateComplaintWizard() {
     }
   };
 
-  // Duplicate Check Trigger
-  const runDuplicateCheck = async () => {
-    if (!title.trim() || !description.trim()) return;
-
-    setCheckingDuplicates(true);
-    try {
-      const res = await checkDuplicatesApi({
-        category,
-        title: title.trim(),
-        description: description.trim(),
-        latitude,
-        longitude,
-        evidence_url: evidenceUrl || undefined,
-      });
-
-      if (res.is_duplicate_likely && res.potential_duplicates.length > 0) {
-        setDuplicatesFound(res.potential_duplicates);
-        setShowDuplicateAlert(true);
-      } else {
-        setDuplicatesFound([]);
-        setShowDuplicateAlert(false);
-      }
-    } catch (err) {
-      console.warn("Duplicate check warning:", err);
-    } finally {
-      setCheckingDuplicates(false);
+  // Duplicate Check Trigger (debounced — waits 800ms after last change)
+  const runDuplicateCheck = (currentTitle: string, currentDesc: string, currentCat: string) => {
+    if (duplicateCheckTimerRef.current) {
+      clearTimeout(duplicateCheckTimerRef.current);
     }
+    if (!currentTitle.trim() || !currentDesc.trim()) return;
+
+    duplicateCheckTimerRef.current = setTimeout(async () => {
+      setCheckingDuplicates(true);
+      try {
+        const res = await checkDuplicatesApi({
+          category: currentCat as any,
+          title: currentTitle.trim(),
+          description: currentDesc.trim(),
+          latitude,
+          longitude,
+          evidence_url: evidenceUrl || undefined,
+        });
+
+        if (res.is_duplicate_likely && res.potential_duplicates.length > 0) {
+          setDuplicatesFound(res.potential_duplicates);
+          setShowDuplicateAlert(true);
+        } else {
+          setDuplicatesFound([]);
+          setShowDuplicateAlert(false);
+        }
+      } catch (err) {
+        console.warn("Duplicate check warning:", err);
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 800);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -393,13 +434,13 @@ function CreateComplaintWizard() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <Link
               href={`/complaints/${createdComplaint.id}`}
-              className="btn-gov-primary text-xs px-6 py-3 w-full sm:w-auto"
+              className="btn-gov-primary text-xs px-6 py-3 w-full sm:w-auto min-h-[48px] flex items-center justify-center"
             >
               View Case File →
             </Link>
             <Link
               href="/dashboard"
-              className="btn-gov-secondary text-xs px-6 py-3 w-full sm:w-auto"
+              className="btn-gov-secondary text-xs px-6 py-3 w-full sm:w-auto min-h-[48px] flex items-center justify-center"
             >
               Go to Dashboard
             </Link>
@@ -411,7 +452,7 @@ function CreateComplaintWizard() {
 
   return (
     <div className="max-w-3xl mx-auto py-4 space-y-6 animate-fade-in">
-      {/* Hidden Inputs for Camera and Gallery */}
+      {/* Hidden File Inputs for Camera and Gallery */}
       <input
         ref={cameraInputRef}
         type="file"
@@ -432,7 +473,7 @@ function CreateComplaintWizard() {
         aria-label="Choose photo from device gallery"
       />
 
-      {/* Page Header */}
+      {/* Header */}
       <div className="space-y-1">
         <span className="text-xs font-bold text-sky-700 uppercase tracking-wider block">
           Official Civic Service Portal
@@ -441,18 +482,18 @@ function CreateComplaintWizard() {
           Report a Problem
         </h1>
         <p className="text-xs text-slate-600">
-          Capture or upload a photo of the infrastructure hazard. AI will analyze the issue and tag your location automatically.
+          Snap a photo of the issue. AI will analyze the defect, suggest details, and tag your location automatically.
         </p>
       </div>
 
       {error && (
         <div role="alert" className="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center justify-between">
           <span><strong>Notice:</strong> {error}</span>
-          <button onClick={() => setError(null)} className="text-rose-700 font-bold ml-2">✕</button>
+          <button onClick={() => setError(null)} className="text-rose-700 font-bold ml-2 cursor-pointer">✕</button>
         </div>
       )}
 
-      {/* ── MODE 1: CAMERA-FIRST LANDING HERO ── */}
+      {/* ── MODE 1: CAMERA-FIRST LANDING ── */}
       {mode === "camera" && !analyzingImage && (
         <div className="space-y-6">
           <div className="gov-card p-6 sm:p-8 bg-white border border-slate-200 space-y-6 text-center shadow-sm">
@@ -466,14 +507,14 @@ function CreateComplaintWizard() {
 
             <div className="space-y-2 max-w-md mx-auto">
               <h2 className="text-xl font-black text-slate-900">
-                Snap a Photo to Begin
+                Snap a Photo & Report
               </h2>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Take a quick photo of the pothole, leak, broken light, or hazard. AI instantly identifies the problem, severity, and category for you.
+                Take a photo of the pothole, water leak, broken light, or hazard. AI instantly identifies the problem, severity, and category for you.
               </p>
             </div>
 
-            {/* DOMINANT CAMERA ACTION BUTTON */}
+            {/* DOMINANT CAMERA ACTION BUTTON (~52px) */}
             <div className="space-y-3 pt-2 max-w-sm mx-auto">
               <button
                 type="button"
@@ -491,7 +532,7 @@ function CreateComplaintWizard() {
                 <button
                   type="button"
                   onClick={() => galleryInputRef.current?.click()}
-                  className="min-h-[44px] px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition-colors flex items-center justify-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                  className="min-h-[48px] px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition-colors flex items-center justify-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
                 >
                   <span>🖼️ Device Gallery</span>
                 </button>
@@ -499,7 +540,7 @@ function CreateComplaintWizard() {
                 <button
                   type="button"
                   onClick={() => setMode("manual")}
-                  className="min-h-[44px] px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-300 transition-colors flex items-center justify-center space-x-1 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                  className="min-h-[48px] px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-300 transition-colors flex items-center justify-center space-x-1 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
                 >
                   <span>Manual Form</span>
                 </button>
@@ -520,7 +561,7 @@ function CreateComplaintWizard() {
 
           {/* Quick Category Guide Cards */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Common Municipal Issues Handled</h3>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Common Municipal Issues</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {CATEGORY_OPTIONS.slice(0, 4).map((cat) => (
                 <div key={cat.value} className="gov-card p-3 bg-white border border-slate-200 flex items-center space-x-2.5">
@@ -533,19 +574,100 @@ function CreateComplaintWizard() {
         </div>
       )}
 
+      {/* ── MODE 2: PHOTO PREVIEW STEP ── */}
+      {mode === "preview" && !analyzingImage && (
+        <div className="gov-card p-6 bg-white border border-slate-200 space-y-6 shadow-sm animate-fade-in">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>📸 Photo Preview</span>
+            </h2>
+            <span className="text-xs text-slate-500 font-medium">Step 2 of 3</span>
+          </div>
+
+          {/* Photo Display */}
+          {imagePreview && (
+            <div className="relative rounded-xl overflow-hidden border border-slate-300 bg-slate-950 aspect-video flex items-center justify-center max-h-[380px]">
+              <img src={imagePreview} alt="Captured issue preview" className="max-h-full max-w-full object-contain" />
+            </div>
+          )}
+
+          {/* Citizen Optional Context / Voice Dictation */}
+          <div className="space-y-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div className="flex items-center justify-between">
+              <label className="gov-label" htmlFor="user-context-input">
+                Add optional description or voice note for AI:
+              </label>
+
+              {speechSupported && (
+                <button
+                  type="button"
+                  onClick={() => toggleVoiceDictation("context")}
+                  className={`text-xs px-3 py-1.5 rounded-md border font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[36px] ${
+                    isListening && voiceTarget === "context"
+                      ? "bg-rose-100 text-rose-800 border-rose-300 animate-pulse"
+                      : "bg-white text-slate-700 hover:bg-slate-100 border-slate-300"
+                  }`}
+                  aria-label="Dictate context by voice"
+                >
+                  <span>{isListening && voiceTarget === "context" ? "🎙️ Listening..." : "🎤 Describe by Voice"}</span>
+                </button>
+              )}
+            </div>
+
+            <input
+              id="user-context-input"
+              type="text"
+              value={userContext}
+              onChange={(e) => setUserContext(e.target.value)}
+              placeholder="e.g., Water leaking near the sidewalk, deep pothole on right lane..."
+              className="gov-input bg-white"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3 pt-2">
+            <button
+              type="button"
+              onClick={confirmAndAnalyzePhoto}
+              className="w-full min-h-[52px] px-6 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-sm border border-sky-700 shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-[0.99]"
+            >
+              <span>✨ Use This Photo & Run AI Analysis →</span>
+            </button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="min-h-[48px] px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition-colors flex items-center justify-center cursor-pointer"
+              >
+                📷 Retake Photo
+              </button>
+
+              <button
+                type="button"
+                onClick={() => galleryInputRef.current?.click()}
+                className="min-h-[48px] px-4 py-2.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-300 transition-colors flex items-center justify-center cursor-pointer"
+              >
+                🖼️ Choose Another
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MODE: ANALYZING SPINNER ── */}
       {analyzingImage && (
         <div className="gov-card p-10 bg-white border border-slate-200 text-center space-y-4 shadow-sm animate-fade-in">
           <div className="w-14 h-14 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mx-auto" />
           <div className="space-y-1">
             <h3 className="text-base font-bold text-slate-900">AI Vision Analyzing Photo...</h3>
-            <p className="text-xs text-slate-600">Identifying infrastructure defect, severity level, and category.</p>
+            <p className="text-xs text-slate-600">Identifying defect type, priority level, and category.</p>
           </div>
         </div>
       )}
 
-      {/* ── MODE 2: REVIEW & ASSISTIVE AI STEP ── */}
-      {mode === "review" && (
+      {/* ── MODE 3: REVIEW & ASSISTIVE AI STEP ── */}
+      {mode === "review" && !analyzingImage && (
         <form onSubmit={handleSubmit} className="space-y-6">
           
           {/* Photo & AI Detection Summary Card */}
@@ -555,15 +677,15 @@ function CreateComplaintWizard() {
                 <span className="w-3 h-3 rounded-full bg-emerald-500" />
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Captured Photo & Detection</h2>
-                  <p className="text-xs text-slate-500">Review AI vision analysis and confirm details</p>
+                  <p className="text-xs text-slate-500">Review AI vision suggestions and edit if needed</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={resetPhoto}
-                className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 transition-colors cursor-pointer"
+                className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-lg border border-rose-200 transition-colors cursor-pointer min-h-[40px] flex items-center"
               >
-                📷 Retake Photo
+                📷 Retake / Choose Photo
               </button>
             </div>
 
@@ -572,7 +694,7 @@ function CreateComplaintWizard() {
               <div className="md:col-span-5">
                 {imagePreview && (
                   <div className="relative rounded-lg overflow-hidden border border-slate-300 bg-black aspect-video flex items-center justify-center">
-                    <img src={imagePreview} alt="Captured civic issue evidence" className="max-h-full max-w-full object-contain" />
+                    <img src={imagePreview} alt="Captured evidence" className="max-h-full max-w-full object-contain" />
                   </div>
                 )}
               </div>
@@ -580,27 +702,29 @@ function CreateComplaintWizard() {
               {/* AI Detection Summary */}
               <div className="md:col-span-7 space-y-3">
                 {/* AI Confidence Notice */}
-                {isAiConfident ? (
+                {isAiConfident && aiConfidence !== null && aiConfidence >= 0.60 ? (
                   <div className="p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold flex items-center gap-1.5">
-                        <span>🤖</span> AI Assistive Recommendation
+                        <span>🤖</span> AI Suggestion
                       </span>
-                      {aiConfidence !== null && (
-                        <span className="px-2 py-0.5 rounded bg-sky-200 text-sky-900 text-[10px] font-mono font-bold">
-                          {Math.round(aiConfidence * 100)}% Confidence
-                        </span>
-                      )}
+                      <span className="px-2 py-0.5 rounded bg-sky-200 text-sky-900 text-[10px] font-mono font-bold">
+                        {Math.round(aiConfidence * 100)}% Confidence
+                      </span>
                     </div>
-                    {aiReasoning && <p className="text-[11px] text-sky-800 leading-snug">{aiReasoning}</p>}
+                    {aiReasoning && (
+                      <p className="text-[11px] text-sky-800 leading-snug">
+                        <strong>We think this may be {aiPrimaryIssue || "a civic defect"}:</strong> {aiReasoning}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-bold">
-                      <span>⚠️</span> We&apos;re not sure what this issue is.
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
+                      <span>⚠️</span> We&apos;re not sure what this issue is. Please review the details.
                     </div>
                     <p className="text-[11px] text-amber-800">
-                      Please select a category and provide a brief description below to help city crews.
+                      Please select a category, title, and description below so municipal crews can respond accurately.
                     </p>
                   </div>
                 )}
@@ -617,7 +741,7 @@ function CreateComplaintWizard() {
               <button
                 type="button"
                 onClick={() => setShowEditFields(!showEditFields)}
-                className="text-xs font-bold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-sky-700 hover:text-sky-900 flex items-center gap-1 cursor-pointer min-h-[36px]"
               >
                 <span>{showEditFields ? "Hide Customization ▲" : "✏️ Edit Details & Category ▼"}</span>
               </button>
@@ -641,8 +765,9 @@ function CreateComplaintWizard() {
                 required
                 value={title}
                 onChange={(e) => {
-                  setTitle(e.target.value);
-                  runDuplicateCheck();
+                  const newTitle = e.target.value;
+                  setTitle(newTitle);
+                  runDuplicateCheck(newTitle, description, category);
                 }}
                 placeholder="Short title describing the issue..."
                 className="gov-input"
@@ -660,15 +785,15 @@ function CreateComplaintWizard() {
                 {speechSupported && (
                   <button
                     type="button"
-                    onClick={toggleVoiceDictation}
-                    className={`text-xs px-2.5 py-1 rounded-md border font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      isListening
+                    onClick={() => toggleVoiceDictation("description")}
+                    className={`text-xs px-2.5 py-1 rounded-md border font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[36px] ${
+                      isListening && voiceTarget === "description"
                         ? "bg-rose-100 text-rose-800 border-rose-300 animate-pulse"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300"
                     }`}
                     aria-label="Dictate complaint description by voice"
                   >
-                    <span>{isListening ? "🎙️ Listening..." : "🎤 Describe by Voice"}</span>
+                    <span>{isListening && voiceTarget === "description" ? "🎙️ Listening..." : "🎤 Describe by Voice"}</span>
                   </button>
                 )}
               </div>
@@ -679,13 +804,14 @@ function CreateComplaintWizard() {
                 rows={3}
                 value={description}
                 onChange={(e) => {
-                  setDescription(e.target.value);
-                  runDuplicateCheck();
+                  const newDesc = e.target.value;
+                  setDescription(newDesc);
+                  runDuplicateCheck(title, newDesc, category);
                 }}
                 placeholder="Provide details about size, hazards, or immediate safety concerns..."
                 className="gov-input resize-none"
               />
-              {isListening && (
+              {isListening && voiceTarget === "description" && (
                 <p className="text-[11px] text-rose-700 font-semibold animate-pulse">
                   🔴 Recording voice... Speak clearly into your device microphone.
                 </p>
@@ -693,7 +819,7 @@ function CreateComplaintWizard() {
             </div>
 
             {/* Category & Urgency Selectors (Visible if low confidence or toggled) */}
-            {(showEditFields || !isAiConfident) && (
+            {(showEditFields || !isAiConfident || (aiConfidence !== null && aiConfidence < 0.60)) && (
               <div className="space-y-5 pt-3 border-t border-slate-200 animate-fade-in">
                 {/* Category Picker */}
                 <div className="space-y-2">
@@ -705,9 +831,9 @@ function CreateComplaintWizard() {
                         key={cat.value}
                         onClick={() => {
                           setCategory(cat.value);
-                          runDuplicateCheck();
+                          runDuplicateCheck(title, description, cat.value);
                         }}
-                        className={`p-2.5 rounded-lg border text-left text-xs transition-colors flex items-center space-x-2 cursor-pointer ${
+                        className={`p-2.5 rounded-lg border text-left text-xs transition-colors flex items-center space-x-2 cursor-pointer min-h-[48px] ${
                           category === cat.value
                             ? "border-sky-600 bg-sky-50 font-bold text-sky-950"
                             : "border-slate-200 hover:border-slate-300 bg-white"
@@ -729,7 +855,7 @@ function CreateComplaintWizard() {
                         type="button"
                         key={p.value}
                         onClick={() => setPriority(p.value)}
-                        className={`p-2 rounded-lg border text-center text-xs transition-colors cursor-pointer ${
+                        className={`p-2 rounded-lg border text-center text-xs transition-colors cursor-pointer min-h-[48px] flex items-center justify-center ${
                           priority === p.value
                             ? "border-sky-600 bg-sky-50 font-bold"
                             : "border-slate-200 bg-white"
@@ -804,7 +930,7 @@ function CreateComplaintWizard() {
                     <Link
                       href={`/complaints/${dup.complaint_id}`}
                       target="_blank"
-                      className="btn-gov-secondary text-[11px] px-2.5 py-1 shrink-0"
+                      className="btn-gov-secondary text-[11px] px-2.5 py-1 shrink-0 min-h-[36px] flex items-center"
                     >
                       View Existing →
                     </Link>
@@ -819,7 +945,7 @@ function CreateComplaintWizard() {
             <button
               type="button"
               onClick={resetPhoto}
-              className="btn-gov-secondary text-xs px-4 py-2.5"
+              className="btn-gov-secondary text-xs px-4 py-2.5 min-h-[48px] flex items-center"
             >
               ← Retake Photo
             </button>
@@ -827,7 +953,7 @@ function CreateComplaintWizard() {
             <button
               type="submit"
               disabled={submitting || analyzingImage}
-              className="btn-gov-blue text-sm px-8 py-3 shadow-md font-black min-h-[48px] cursor-pointer"
+              className="btn-gov-blue text-sm px-8 py-3 shadow-md font-black min-h-[48px] cursor-pointer flex items-center"
             >
               {submitting ? "Submitting Report..." : "Submit Complaint Now →"}
             </button>
@@ -836,7 +962,7 @@ function CreateComplaintWizard() {
         </form>
       )}
 
-      {/* ── MODE 3: MANUAL FORM (NO PHOTO) ── */}
+      {/* ── MODE 4: MANUAL FORM (NO PHOTO FALLBACK) ── */}
       {mode === "manual" && (
         <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
           <div className="gov-card p-6 bg-white border border-slate-200 space-y-6">
@@ -845,7 +971,7 @@ function CreateComplaintWizard() {
               <button
                 type="button"
                 onClick={() => setMode("camera")}
-                className="text-xs font-bold text-sky-700 hover:underline"
+                className="text-xs font-bold text-sky-700 hover:underline cursor-pointer min-h-[36px] flex items-center"
               >
                 📷 Switch to Camera Flow
               </button>
@@ -860,7 +986,7 @@ function CreateComplaintWizard() {
                     type="button"
                     key={cat.value}
                     onClick={() => setCategory(cat.value)}
-                    className={`p-2.5 rounded-lg border text-left text-xs transition-colors flex items-center space-x-2 cursor-pointer ${
+                    className={`p-2.5 rounded-lg border text-left text-xs transition-colors flex items-center space-x-2 cursor-pointer min-h-[48px] ${
                       category === cat.value
                         ? "border-sky-600 bg-sky-50 font-bold text-sky-950"
                         : "border-slate-200 hover:border-slate-300 bg-white"
@@ -910,7 +1036,7 @@ function CreateComplaintWizard() {
                     type="button"
                     key={p.value}
                     onClick={() => setPriority(p.value)}
-                    className={`p-2 rounded-lg border text-center text-xs transition-colors cursor-pointer ${
+                    className={`p-2 rounded-lg border text-center text-xs transition-colors cursor-pointer min-h-[48px] flex items-center justify-center ${
                       priority === p.value
                         ? "border-sky-600 bg-sky-50 font-bold"
                         : "border-slate-200 bg-white"
@@ -941,14 +1067,14 @@ function CreateComplaintWizard() {
               <button
                 type="button"
                 onClick={() => setMode("camera")}
-                className="btn-gov-secondary text-xs px-4 py-2"
+                className="btn-gov-secondary text-xs px-4 py-2.5 min-h-[48px] flex items-center"
               >
                 ← Back to Camera
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="btn-gov-blue text-xs px-8 py-3 shadow-xs font-bold"
+                className="btn-gov-blue text-xs px-8 py-3 shadow-xs font-bold min-h-[48px] flex items-center"
               >
                 {submitting ? "Submitting..." : "Submit Complaint →"}
               </button>

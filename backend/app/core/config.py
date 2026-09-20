@@ -16,15 +16,26 @@ except ImportError:
 
 def _parse_cors(v: Union[str, List[str]]) -> List[str]:
     """Parse BACKEND_CORS_ORIGINS from a JSON array string or comma-separated string."""
+    origins: List[str] = []
     if isinstance(v, list):
-        return v
-    try:
-        parsed = json.loads(v)
-        if isinstance(parsed, list):
-            return [o.strip() for o in parsed]
-    except (json.JSONDecodeError, TypeError):
-        pass
-    return [o.strip() for o in v.split(",") if o.strip()]
+        origins = [str(o).rstrip('/') for o in v]
+    elif isinstance(v, str):
+        try:
+            parsed = json.loads(v)
+            if isinstance(parsed, list):
+                origins = [str(o).rstrip('/') for o in parsed]
+            else:
+                origins = [str(o).rstrip('/') for o in v.split(",") if o.strip()]
+        except (json.JSONDecodeError, TypeError):
+            origins = [str(o).rstrip('/') for o in v.split(",") if o.strip()]
+
+    default_dev_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    for dev_origin in default_dev_origins:
+        if dev_origin not in origins:
+            origins.append(dev_origin)
+
+    return origins
+
 
 
 if PYDANTIC_V2:
@@ -36,7 +47,7 @@ if PYDANTIC_V2:
         API_V1_STR: str = "/api/v1"
         DEBUG: bool = False
 
-        DATABASE_URL: str = "postgresql://localhost:5432/civicfix"
+        DATABASE_URL: str = "sqlite:///./test.db"
 
         JWT_SECRET_KEY: str = "change-this-secret-key-in-production"
         JWT_ALGORITHM: str = "HS256"
@@ -69,7 +80,7 @@ else:
         API_V1_STR: str = "/api/v1"
         DEBUG: bool = False
 
-        DATABASE_URL: str = "postgresql://localhost:5432/civicfix"
+        DATABASE_URL: str = "sqlite:///./test.db"
 
         JWT_SECRET_KEY: str = "change-this-secret-key-in-production"
         JWT_ALGORITHM: str = "HS256"

@@ -3,7 +3,8 @@
 import uuid
 import enum
 from sqlalchemy import Column, String, Text, DateTime, Enum as SQLEnum, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Text, DateTime, Enum as SQLEnum, ForeignKey, func
+# Use String for UUID fields for SQLite compatibility
 from sqlalchemy.orm import relationship
 
 from ..db.base import Base
@@ -27,15 +28,15 @@ class ActivityEventEnum(str, enum.Enum):
 class ComplaintActivity(Base):
     __tablename__ = "complaint_activities"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     complaint_id = Column(
-        UUID(as_uuid=True),
+        String(36),
         ForeignKey("complaints.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
     actor_id = Column(
-        UUID(as_uuid=True),
+        String(36),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         index=True

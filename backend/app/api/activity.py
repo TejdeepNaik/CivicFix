@@ -38,12 +38,12 @@ def get_complaint_activity(
     - **Worker**: may view activity for any complaint (subject to their scope).
     - **Admins**: may view any complaint's activity.
     """
-    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    complaint = db.query(Complaint).filter(Complaint.id == str(complaint_id)).first()
     if not complaint:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found")
 
     # RBAC: citizens can only view their own complaint's activity
-    if current_user.role == RoleEnum.CITIZEN and complaint.citizen_id != current_user.id:
+    if current_user.role == RoleEnum.CITIZEN and str(complaint.citizen_id) != str(current_user.id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access forbidden: You can only view activity for your own complaints",
@@ -51,7 +51,7 @@ def get_complaint_activity(
 
     query = (
         db.query(ComplaintActivity)
-        .filter(ComplaintActivity.complaint_id == complaint_id)
+        .filter(ComplaintActivity.complaint_id == str(complaint_id))
         .order_by(asc(ComplaintActivity.created_at))
     )
     total = query.count()

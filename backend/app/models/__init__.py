@@ -3,6 +3,7 @@
 from .role import RoleEnum
 from .department import Department
 from .user import User
+from .cluster import IssueCluster
 from .complaint import (
     Complaint,
     ComplaintStatusEnum,
@@ -16,6 +17,7 @@ __all__ = [
     "RoleEnum",
     "Department",
     "User",
+    "IssueCluster",
     "Complaint",
     "ComplaintStatusEnum",
     "ComplaintPriorityEnum",

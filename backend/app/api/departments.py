@@ -81,7 +81,7 @@ def get_department(
     _current_user: User = Depends(require_roles(*DEPARTMENT_READ_ROLES))
 ) -> DepartmentResponse:
     """Get a department by UUID. Accessible to admin/worker roles."""
-    dept = db.query(Department).filter(Department.id == department_id).first()
+    dept = db.query(Department).filter(Department.id == str(department_id)).first()
     if not dept:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -102,7 +102,7 @@ def update_department(
     _current_user: User = Depends(require_roles(*DEPARTMENT_MANAGE_ROLES))
 ) -> DepartmentResponse:
     """Update department name, code, or description. Restricted to CITY_ADMIN and SUPER_ADMIN."""
-    dept = db.query(Department).filter(Department.id == department_id).first()
+    dept = db.query(Department).filter(Department.id == str(department_id)).first()
     if not dept:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

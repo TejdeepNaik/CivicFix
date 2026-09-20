@@ -3,7 +3,8 @@
 import uuid
 import enum
 from sqlalchemy import Column, String, Text, DateTime, Boolean, Enum as SQLEnum, ForeignKey, Index, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, ForeignKey, Index, func
+# Use String for UUID fields for SQLite compatibility
 from sqlalchemy.orm import relationship
 
 from ..db.base import Base
@@ -29,15 +30,15 @@ class NotificationTypeEnum(str, enum.Enum):
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     recipient_id = Column(
-        UUID(as_uuid=True),
+        String(36),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
     complaint_id = Column(
-        UUID(as_uuid=True),
+        String(36),
         ForeignKey("complaints.id", ondelete="CASCADE"),
         nullable=True,
         index=True

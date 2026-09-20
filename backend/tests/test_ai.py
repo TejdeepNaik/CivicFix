@@ -392,3 +392,25 @@ def test_analyze_endpoint_full_flow(db_session, test_user):
     assert isinstance(data["summary"], str)
     assert isinstance(data["is_duplicate_likely"], bool)
     assert isinstance(data["potential_duplicates"], list)
+
+
+def test_analyze_image_endpoint_with_user_context(test_user):
+    token = create_access_token(subject=str(test_user.id))
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Dummy 1x1 GIF / JPEG image bytes
+    dummy_image = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xafA4\x00\x00\x00\x00IEND\xaeB`\x82"
+    files = {"file": ("test.png", dummy_image, "image/png")}
+    data = {"user_context": "Deep pothole causing traffic slowdown"}
+
+    res = client.post(
+        f"{settings.API_V1_STR}/complaints/analyze-image?latitude=41.8781&longitude=-87.6298",
+        files=files,
+        data=data,
+        headers=headers
+    )
+    assert res.status_code == 200
+    res_data = res.json()
+    assert "evidence_url" in res_data
+    assert "analysis_available" in res_data
+

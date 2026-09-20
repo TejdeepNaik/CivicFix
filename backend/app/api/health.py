@@ -19,10 +19,7 @@ def check_health(db: Session = Depends(get_db)) -> HealthStatus:
         db.execute(text("SELECT 1"))
         db_status = "connected"
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database connection failure: {str(e)}"
-        )
+        db_status = f"degraded: {str(e)}"
 
     return HealthStatus(
         status="ok",
