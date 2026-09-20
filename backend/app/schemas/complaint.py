@@ -12,8 +12,8 @@ from ..models.complaint import (
 
 
 class ComplaintBase(BaseModel):
-    title: str = Field(..., min_length=3, max_length=200, description="Title of the complaint")
-    description: str = Field(..., min_length=10, description="Detailed description of the civic issue")
+    title: str = Field(..., max_length=200, description="Title of the complaint")
+    description: str = Field(..., description="Detailed description of the civic issue")
     category: ComplaintCategoryEnum = Field(default=ComplaintCategoryEnum.OTHER)
     latitude: float = Field(..., ge=-90.0, le=90.0, description="Latitude between -90 and 90")
     longitude: float = Field(..., ge=-180.0, le=180.0, description="Longitude between -180 and 180")
@@ -22,6 +22,8 @@ class ComplaintBase(BaseModel):
 
 
 class ComplaintCreate(ComplaintBase):
+    title: str = Field(..., min_length=3, max_length=200, description="Title of the complaint")
+    description: str = Field(..., min_length=10, description="Detailed description of the civic issue")
     priority: Optional[ComplaintPriorityEnum] = ComplaintPriorityEnum.MEDIUM
 
 
