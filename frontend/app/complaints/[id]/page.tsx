@@ -15,6 +15,7 @@ import {
   updateComplaintApi,
   listDepartmentsApi,
   getToken,
+  getMediaUrl,
 } from "../../../lib/api";
 import {
   Complaint,
@@ -57,6 +58,7 @@ function ComplaintDetailContent() {
   const [analyzingAi, setAnalyzingAi] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState("");
@@ -338,27 +340,31 @@ function ComplaintDetailContent() {
                     </div>
 
                     <div className="space-y-2">
-                      {aiAnalysis.potential_duplicates.map((dup: any) => (
-                        <Link
-                          key={dup.complaint_id}
-                          href={`/complaints/${dup.complaint_id}`}
-                          className="block p-3 rounded bg-white border border-slate-200 hover:border-sky-500 transition-colors space-y-1 group"
-                        >
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-slate-900 group-hover:text-sky-700 transition-colors">
-                              {dup.title}
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-                              {(dup.similarity_score * 100).toFixed(0)}% Match
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2 text-[11px] text-slate-500">
-                            <span className="capitalize">{dup.category}</span>
-                            <span>•</span>
-                            <span className="uppercase">{dup.status}</span>
-                          </div>
-                        </Link>
-                      ))}
+                      {aiAnalysis.potential_duplicates.map((dup: any) => {
+                        const targetId = dup.complaint_id || dup.id;
+                        if (!targetId) return null;
+                        return (
+                          <Link
+                            key={targetId}
+                            href={`/complaints/${targetId}`}
+                            className="block p-3 rounded bg-white border border-slate-200 hover:border-sky-500 transition-colors space-y-1 group"
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-900 group-hover:text-sky-700 transition-colors">
+                                {dup.title}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                                {(dup.similarity_score * 100).toFixed(0)}% Match
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-[11px] text-slate-500">
+                              <span className="capitalize">{dup.category}</span>
+                              <span>•</span>
+                              <span className="uppercase">{dup.status}</span>
+                            </div>
+                          </Link>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
@@ -461,17 +467,21 @@ function ComplaintDetailContent() {
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 Photo Evidence
               </h3>
-              <div className="rounded-lg overflow-hidden border border-slate-300 max-h-52 bg-slate-900 flex justify-center">
-                <img
-                  src={
-                    complaint.evidence_url.startsWith("http")
-                      ? complaint.evidence_url
-                      : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${complaint.evidence_url}`
-                  }
-                  alt="Complaint photo evidence"
-                  className="object-contain max-h-52 w-full"
-                />
-              </div>
+              {!imageError ? (
+                <div className="rounded-lg overflow-hidden border border-slate-300 max-h-52 bg-slate-900 flex justify-center">
+                  <img
+                    src={getMediaUrl(complaint.evidence_url)}
+                    alt="Complaint photo evidence"
+                    onError={() => setImageError(true)}
+                    className="object-contain max-h-52 w-full"
+                  />
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 text-xs flex items-center gap-2">
+                  <span>🖼️</span>
+                  <span className="font-semibold">Evidence image unavailable</span>
+                </div>
+              )}
             </div>
           )}
 

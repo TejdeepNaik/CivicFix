@@ -14,6 +14,14 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
+export function getMediaUrl(path?: string | null): string {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  const backendBase = API_BASE.replace(/\/api\/v1\/?$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${backendBase}${cleanPath}`;
+}
+
 const TOKEN_KEY = "civicfix_token";
 
 export function getToken(): string | null {

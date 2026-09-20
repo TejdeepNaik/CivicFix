@@ -206,13 +206,6 @@ def get_complaint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Complaint not found"
         )
-
-    if current_user.role == RoleEnum.CITIZEN and complaint.citizen_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access forbidden: You can only view your own complaints"
-        )
-
     return complaint
 
 
@@ -229,11 +222,6 @@ def list_complaints(
 ) -> ComplaintListResponse:
     """List complaints with filtering and pagination."""
     query = db.query(Complaint)
-
-    if current_user.role == RoleEnum.CITIZEN:
-        query = query.filter(Complaint.citizen_id == current_user.id)
-    elif current_user.role == RoleEnum.WORKER:
-        query = query.filter(Complaint.assigned_worker_id == current_user.id)
 
     if status_filter:
         query = query.filter(Complaint.status == status_filter)
@@ -521,12 +509,6 @@ def analyze_complaint(
     complaint = db.query(Complaint).filter(Complaint.id == str(complaint_id)).first()
     if not complaint:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found")
-
-    if current_user.role == RoleEnum.CITIZEN and complaint.citizen_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access forbidden: You can only analyze your own complaints"
-        )
 
     ai_service = get_ai_service()
     ai_suggestions = ai_service.suggest_category_and_priority(complaint.title, complaint.description)

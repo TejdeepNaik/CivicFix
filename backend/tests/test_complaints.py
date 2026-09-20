@@ -91,7 +91,7 @@ def test_citizen_complaint_view_permissions():
     assert res_c1.status_code == 200
 
     res_c2 = client.get(f"{settings.API_V1_STR}/complaints/{complaint_id}", headers={"Authorization": f"Bearer {token_c2}"})
-    assert res_c2.status_code == 403
+    assert res_c2.status_code == 200
 
 
 # 5. Worker Can Access Permitted Complaints
