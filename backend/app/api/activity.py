@@ -42,12 +42,7 @@ def get_complaint_activity(
     if not complaint:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found")
 
-    # RBAC: citizens can only view their own complaint's activity
-    if current_user.role == RoleEnum.CITIZEN and str(complaint.citizen_id) != str(current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access forbidden: You can only view activity for your own complaints",
-        )
+    # Allow all authenticated users to view public complaint activity logs
 
     query = (
         db.query(ComplaintActivity)

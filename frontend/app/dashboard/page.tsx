@@ -69,8 +69,15 @@ function CitizenDashboardView() {
   if (error) return <ErrorMessage text={error} />;
   if (!data) return null;
 
-  const pendingVerificationCount = data.recent_complaints.filter(
-    (c) => c.status === "resolved"
+  const recentComplaints = data.recent_complaints || [];
+  const statusBreakdown = data.status_breakdown || {};
+  const recentActivity = data.recent_activity || [];
+  const totalComplaints = data.total_complaints ?? 0;
+  const openComplaintsCount = data.open_complaints_count ?? 0;
+  const resolvedClosedCount = data.resolved_closed_count ?? 0;
+
+  const pendingVerificationCount = recentComplaints.filter(
+    (c) => c?.status === "resolved"
   ).length;
 
   return (
@@ -108,7 +115,7 @@ function CitizenDashboardView() {
             <span className="text-sky-400">→</span>
           </Link>
           <Link href="#my-issues" className="p-2.5 rounded bg-slate-800/80 border border-slate-700 hover:border-sky-500 transition-colors flex items-center justify-between">
-            <span className="font-bold text-white">2. My Reports ({data.total_complaints})</span>
+            <span className="font-bold text-white">2. My Reports ({totalComplaints})</span>
             <span className="text-sky-400">→</span>
           </Link>
           <Link href="/complaints" className="p-2.5 rounded bg-slate-800/80 border border-slate-700 hover:border-sky-500 transition-colors flex items-center justify-between">
@@ -122,17 +129,17 @@ function CitizenDashboardView() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="gov-card p-4 space-y-1 bg-white border-t-2 border-t-[#0f2942]">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Logged</span>
-          <div className="text-2xl font-bold text-slate-900">{data.total_complaints}</div>
+          <div className="text-2xl font-bold text-slate-900">{totalComplaints}</div>
         </div>
 
         <div className="gov-card p-4 space-y-1 bg-amber-50/70 border-t-2 border-t-amber-600">
           <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">Active Open Workload</span>
-          <div className="text-2xl font-bold text-amber-900">{data.open_complaints_count}</div>
+          <div className="text-2xl font-bold text-amber-900">{openComplaintsCount}</div>
         </div>
 
         <div className="gov-card p-4 space-y-1 bg-emerald-50/70 border-t-2 border-t-emerald-600">
           <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider block">Resolved & Closed</span>
-          <div className="text-2xl font-bold text-emerald-900">{data.resolved_closed_count}</div>
+          <div className="text-2xl font-bold text-emerald-900">{resolvedClosedCount}</div>
         </div>
 
         <div className="gov-card p-4 space-y-1 bg-sky-50/70 border-t-2 border-t-sky-600">
@@ -144,11 +151,11 @@ function CitizenDashboardView() {
       {/* Status Breakdown Summary */}
       <div className="gov-card p-4 space-y-2 bg-white">
         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Status Breakdown Summary</h3>
-        {Object.keys(data.status_breakdown).length === 0 ? (
+        {Object.keys(statusBreakdown).length === 0 ? (
           <p className="text-xs text-slate-500">No complaints reported yet.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {Object.entries(data.status_breakdown).map(([status, count]) => (
+            {Object.entries(statusBreakdown).map(([status, count]) => (
               <div
                 key={status}
                 className="flex items-center space-x-2 bg-slate-50 px-2.5 py-1 rounded border border-slate-200"
@@ -173,7 +180,7 @@ function CitizenDashboardView() {
             </Link>
           </div>
 
-          {data.recent_complaints.length === 0 ? (
+          {recentComplaints.length === 0 ? (
             <EmptyState
               icon="📋"
               title="No issues reported yet"
@@ -183,7 +190,7 @@ function CitizenDashboardView() {
             />
           ) : (
             <div className="space-y-2">
-              {data.recent_complaints.map((c) => (
+              {recentComplaints.map((c) => (
                 <Link
                   key={c.id}
                   href={`/complaints/${c.id}`}
@@ -213,11 +220,11 @@ function CitizenDashboardView() {
         {/* Recent Audit Stream */}
         <div className="lg:col-span-5 gov-card p-5 space-y-3 bg-white">
           <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider pb-2 border-b border-slate-200">Recent Activity Trail</h3>
-          {data.recent_activity.length === 0 ? (
+          {recentActivity.length === 0 ? (
             <p className="text-xs text-slate-500 py-4 text-center">No recent activity logged.</p>
           ) : (
             <div className="space-y-2">
-              {data.recent_activity.map((act) => (
+              {recentActivity.map((act) => (
                 <div key={act.id} className="p-2.5 rounded bg-slate-50 border border-slate-200 space-y-0.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-sky-800 capitalize">{act.event_type.replace(/_/g, " ")}</span>

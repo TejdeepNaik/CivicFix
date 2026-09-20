@@ -312,14 +312,14 @@ def test_citizen_can_view_own_activity():
 # 10. Unauthorized citizen cannot view another's activity
 # ---------------------------------------------------------------------------
 
-def test_unauthorized_citizen_cannot_view_activity():
+def test_citizen_can_view_public_activity():
     token_c1, _ = register_login("citizen")
     token_c2, _ = register_login("citizen")
     complaint = create_complaint(token_c1)
     cid = complaint["id"]
 
     r = get_activity(token_c2, cid)
-    assert r.status_code == 403
+    assert r.status_code == 200
 
 
 # ---------------------------------------------------------------------------

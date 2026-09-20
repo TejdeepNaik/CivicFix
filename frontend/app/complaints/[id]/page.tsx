@@ -14,6 +14,7 @@ import {
   verifyComplaintApi,
   updateComplaintApi,
   listDepartmentsApi,
+  analyzeComplaintApi,
   getToken,
   getMediaUrl,
 } from "../../../lib/api";
@@ -73,13 +74,18 @@ function ComplaintDetailContent() {
     if (!complaintId) return;
     setLoading(true);
     setError(null);
+    setImageError(false);
+    setAiAnalysis(null);
+    setActivities([]);
+
     try {
-      const [cData, actData] = await Promise.all([
-        getComplaintApi(complaintId),
-        getComplaintActivityApi(complaintId),
-      ]);
+      const cData = await getComplaintApi(complaintId);
       setComplaint(cData);
-      setActivities(actData.items);
+
+      // Resilient background activity log loading
+      getComplaintActivityApi(complaintId)
+        .then((actData) => setActivities(actData.items || []))
+        .catch(() => setActivities([]));
 
       if (
         user?.role === RoleEnum.CITY_ADMIN ||
@@ -103,19 +109,8 @@ function ComplaintDetailContent() {
   const runAiAnalysis = async (cId: string) => {
     setAnalyzingAi(true);
     try {
-      const token = getToken();
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-      const res = await fetch(`${apiBase}/complaints/${cId}/analyze`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setAiAnalysis(json);
-      }
+      const res = await analyzeComplaintApi(cId);
+      setAiAnalysis(res);
     } catch {
       // Non-blocking AI analysis fallback
     } finally {
@@ -188,12 +183,12 @@ function ComplaintDetailContent() {
         <div className="p-6 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">
           {error || "Complaint record not found"}
         </div>
-        <button
-          onClick={() => router.back()}
-          className="btn-gov-secondary text-xs px-5 py-2.5"
+        <Link
+          href="/complaints"
+          className="btn-gov-secondary inline-block text-xs px-5 py-2.5"
         >
-          ← Go Back to Register
-        </button>
+          ← Back to Complaints Directory
+        </Link>
       </div>
     );
   }
