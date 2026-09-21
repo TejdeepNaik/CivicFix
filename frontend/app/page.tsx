@@ -70,28 +70,7 @@ const ISSUE_CATEGORIES = [
   },
 ];
 
-const HOW_IT_WORKS = [
-  {
-    step: "1",
-    title: "Report a Problem",
-    desc: "Submit complaint details, GPS location pin, and optional photo evidence.",
-  },
-  {
-    step: "2",
-    title: "AI Analysis & Routing",
-    desc: "Automated engine checks duplicate reports and routes to the responsible department.",
-  },
-  {
-    step: "3",
-    title: "Field Crew Dispatch",
-    desc: "Assigned municipal workers receive task details with precise location coordinates.",
-  },
-  {
-    step: "4",
-    title: "Resolution & Verification",
-    desc: "Worker resolves the issue, uploads proof, and reporter verifies completion.",
-  },
-];
+
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -320,25 +299,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── SECTION 2: How CivicFix Works ── */}
-      <section className="space-y-4">
-        <div className="space-y-0.5">
-          <span className="text-xs font-bold text-sky-700 uppercase tracking-wider block">Structured Workflow</span>
-          <h2 className="text-xl font-bold text-slate-900">How CivicFix Works</h2>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {HOW_IT_WORKS.map((item) => (
-            <div key={item.step} className="gov-card p-4 space-y-2 bg-white border border-slate-200">
-              <div className="w-7 h-7 rounded bg-[#0f2942] text-white font-bold text-xs flex items-center justify-center">
-                {item.step}
-              </div>
-              <h3 className="font-bold text-xs text-slate-900">{item.title}</h3>
-              <p className="text-[11px] text-slate-600 leading-snug">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* ── SECTION 3: Explore Interactive Map Directory ── */}
       <section className="gov-card p-6 bg-white border border-slate-200 space-y-4">
