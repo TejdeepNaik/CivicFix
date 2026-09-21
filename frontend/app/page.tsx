@@ -201,30 +201,82 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── PLATFORM METRICS BANNER ── */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="gov-card p-4 bg-white border-l-4 border-l-slate-900 border border-slate-200 flex items-center gap-3">
-          <div>
-            <span className="text-2xl font-black text-slate-900 block leading-none">100%</span>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 block">Transparent Tracking</span>
-          </div>
+      {/* ── HOW CIVICFIX WORKS ── */}
+      <section className="space-y-4 py-2">
+        <div className="text-center space-y-1 max-w-2xl mx-auto">
+          <span className="text-xs font-bold text-sky-700 uppercase tracking-wider block">Simple Process</span>
+          <h2 className="text-2xl font-black text-slate-900">How CivicFix Works</h2>
+          <p className="text-xs text-slate-600">
+            Report civic issues in a few simple steps and follow their progress until resolution.
+          </p>
         </div>
-        <div className="gov-card p-4 bg-white border-l-4 border-l-sky-600 border border-slate-200 flex items-center gap-3">
-          <div>
-            <span className="text-2xl font-black text-sky-700 block leading-none">24/7</span>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 block">Online Submission</span>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* STEP 01 */}
+          <div className="gov-card p-5 bg-white border border-slate-200 relative flex flex-col justify-between space-y-3 shadow-xs hover:border-sky-300 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-2xl font-black text-sky-600/30 font-mono">01</span>
+              <div className="w-10 h-10 rounded-lg bg-sky-50 border border-sky-200 flex items-center justify-center text-xl">
+                📷
+              </div>
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <h3 className="text-sm font-bold text-slate-900">REPORT AN ISSUE</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Spot a problem? Capture a photo, describe the issue, and share its location.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="gov-card p-4 bg-white border-l-4 border-l-emerald-600 border border-slate-200 flex items-center gap-3">
-          <div>
-            <span className="text-xl font-black text-emerald-700 block leading-none">AI</span>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 block">Duplicate Detection</span>
+
+          {/* STEP 02 */}
+          <div className="gov-card p-5 bg-white border border-slate-200 relative flex flex-col justify-between space-y-3 shadow-xs hover:border-sky-300 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-2xl font-black text-sky-600/30 font-mono">02</span>
+              <div className="w-10 h-10 rounded-lg bg-sky-50 border border-sky-200 flex items-center justify-center text-xl">
+                🤖
+              </div>
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <h3 className="text-sm font-bold text-slate-900">AI ANALYZES & ORGANIZES</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                CivicFix analyzes the submitted evidence, identifies the issue category, and helps detect similar reports.
+              </p>
+              <span className="inline-block text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded border border-slate-200 mt-1">
+                * AI assistance is used when available.
+              </span>
+            </div>
           </div>
-        </div>
-        <div className="gov-card p-4 bg-white border-l-4 border-l-amber-600 border border-slate-200 flex items-center gap-3">
-          <div>
-            <span className="text-xl font-black text-amber-700 block leading-none">GPS</span>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mt-0.5 block">Field Accuracy</span>
+
+          {/* STEP 03 */}
+          <div className="gov-card p-5 bg-white border border-slate-200 relative flex flex-col justify-between space-y-3 shadow-xs hover:border-sky-300 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-2xl font-black text-sky-600/30 font-mono">03</span>
+              <div className="w-10 h-10 rounded-lg bg-sky-50 border border-sky-200 flex items-center justify-center text-xl">
+                📊
+              </div>
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <h3 className="text-sm font-bold text-slate-900">TRACK THE PROGRESS</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Follow your report as it moves through the civic service workflow, from submission to action.
+              </p>
+            </div>
+          </div>
+
+          {/* STEP 04 */}
+          <div className="gov-card p-5 bg-white border border-slate-200 relative flex flex-col justify-between space-y-3 shadow-xs hover:border-sky-300 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-2xl font-black text-emerald-600/30 font-mono">04</span>
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl">
+                ✅
+              </div>
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <h3 className="text-sm font-bold text-slate-900">GET IT RESOLVED</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Once the issue is addressed, the report status is updated so citizens can see the outcome.
+              </p>
+            </div>
           </div>
         </div>
       </section>

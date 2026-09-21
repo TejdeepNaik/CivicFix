@@ -48,10 +48,17 @@ from ..services.notifications import (
     record_department_assigned,
     record_worker_assigned,
 )
+from ..core.config import settings
 
 ai_logger = logging.getLogger("civicfix.ai_diagnostics")
 
 router = APIRouter()
+
+# Resolve the evidence upload directory once at module load time from settings.
+# Local dev default: ./uploads/evidence (relative to cwd).
+# Production:        /app/uploads/evidence (set UPLOAD_DIR=/app/uploads via Railway env var).
+_EVIDENCE_DIR = os.path.join(os.path.abspath(settings.UPLOAD_DIR), "evidence")
+os.makedirs(_EVIDENCE_DIR, exist_ok=True)
 
 ALLOWED_MIME_TYPES = {
     "image/jpeg", "image/jpg", "image/png", "image/webp",
@@ -181,9 +188,8 @@ def upload_evidence(
         )
 
     filename = f"{uuid.uuid4()}.jpg"
-    upload_dir = os.path.join(os.getcwd(), "uploads", "evidence")
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, filename)
+    os.makedirs(_EVIDENCE_DIR, exist_ok=True)
+    file_path = os.path.join(_EVIDENCE_DIR, filename)
 
     with open(file_path, "wb") as f:
         f.write(norm_bytes)
@@ -294,9 +300,8 @@ def analyze_image(
         return analysis
 
     filename = f"{uuid.uuid4()}.jpg"
-    upload_dir = os.path.join(os.getcwd(), "uploads", "evidence")
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, filename)
+    os.makedirs(_EVIDENCE_DIR, exist_ok=True)
+    file_path = os.path.join(_EVIDENCE_DIR, filename)
 
     with open(file_path, "wb") as f:
         f.write(norm_bytes)

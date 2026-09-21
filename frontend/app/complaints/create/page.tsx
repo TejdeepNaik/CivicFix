@@ -78,6 +78,7 @@ function CreateComplaintWizard() {
   const duplicateCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [analyzingImage, setAnalyzingImage] = useState(false);
+  const [isAiAvailable, setIsAiAvailable] = useState<boolean>(false);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [isAiConfident, setIsAiConfident] = useState<boolean>(true);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
@@ -96,6 +97,8 @@ function CreateComplaintWizard() {
   const [longitude, setLongitude] = useState<number>(-87.6298);
   const [address, setAddress] = useState("");
   const [gpsStatus, setGpsStatus] = useState<"pending" | "granted" | "denied">("pending");
+  const [isDetectingLocation, setIsDetectingLocation] = useState<boolean>(false);
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
   // Duplicate Check State
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
@@ -113,25 +116,8 @@ function CreateComplaintWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [createdComplaint, setCreatedComplaint] = useState<Complaint | null>(null);
 
-  // Auto-Fetch Geolocation on load
+  // Check Speech Recognition support on load (Do NOT request location immediately on load)
   useEffect(() => {
-    if (typeof window !== "undefined" && "geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLatitude(pos.coords.latitude);
-          setLongitude(pos.coords.longitude);
-          setGpsStatus("granted");
-        },
-        () => {
-          setGpsStatus("denied");
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
-    } else {
-      setGpsStatus("denied");
-    }
-
-    // Check Speech Recognition support
     if (typeof window !== "undefined") {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -140,6 +126,50 @@ function CreateComplaintWizard() {
       }
     }
   }, []);
+
+  // One-time current location request trigger (User Tapped "Use My Current Location")
+  const requestCurrentLocation = () => {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) {
+      setGpsStatus("denied");
+      setLocationMessage("We couldn't access your current location. Please select the location manually on the map.");
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    setLocationMessage(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setLatitude(lat);
+        setLongitude(lng);
+        setGpsStatus("granted");
+        setLocationMessage("Location detected");
+        setIsDetectingLocation(false);
+
+        // Attempt reverse geocoding for address
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.display_name) {
+              setAddress(data.display_name);
+            }
+          })
+          .catch(() => {});
+      },
+      (err) => {
+        setIsDetectingLocation(false);
+        setGpsStatus("denied");
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationMessage("Location permission was denied. You can select the issue location manually on the map.");
+        } else {
+          setLocationMessage("We couldn't access your current location. Please select the location manually on the map.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   const handleLocationChange = (lat: number, lng: number, addr?: string) => {
     setLatitude(lat);
@@ -167,6 +197,7 @@ function CreateComplaintWizard() {
     // Clear all previous AI analysis state when selecting a new photo
     setError(null);
     setEvidenceUrl(null);
+    setIsAiAvailable(false);
     setAiConfidence(null);
     setAiReasoning(null);
     setAiPrimaryIssue(null);
@@ -201,6 +232,7 @@ function CreateComplaintWizard() {
 
     // Reset previous AI outputs before new analysis request
     setEvidenceUrl(null);
+    setIsAiAvailable(false);
     setAiConfidence(null);
     setAiReasoning(null);
     setAiPrimaryIssue(null);
@@ -220,6 +252,7 @@ function CreateComplaintWizard() {
       setAiPrimaryIssue(analysis.primary_issue || null);
 
       const isAvailable = analysis.analysis_available !== false;
+      setIsAiAvailable(isAvailable);
 
       if (isAvailable && conf >= 0.60 && analysis.is_civic_issue) {
         setIsAiConfident(true);
@@ -257,14 +290,14 @@ function CreateComplaintWizard() {
         }
         setDescription(descText);
       } else {
-        // Vision model unavailable or low confidence — force manual review without fake pothole/medium classification
+        // Vision model unavailable or low confidence — force manual review without fake classification
         setIsAiConfident(false);
         setShowEditFields(true);
         setCategory((preselectedCategory as ComplaintCategoryEnum) || "");
         setPriority(ComplaintPriorityEnum.MEDIUM);
 
         if (!isAvailable) {
-          setError("AI vision analysis is currently unavailable. Please select the issue category and fill in details manually.");
+          setError("AI analysis is currently unavailable. You can continue by selecting the category manually.");
           setTitle(userContext.trim() || "Civic Infrastructure Issue");
           setDescription(userContext.trim() || "");
         } else {
@@ -280,13 +313,14 @@ function CreateComplaintWizard() {
       }
     } catch (err: any) {
       console.warn("Vision analysis failed, proceeding with manual details:", err);
+      setIsAiAvailable(false);
       setIsAiConfident(false);
       setShowEditFields(true);
       setCategory((preselectedCategory as ComplaintCategoryEnum) || "");
       setPriority(ComplaintPriorityEnum.MEDIUM);
       setTitle(userContext.trim() || "Civic Infrastructure Issue");
       setDescription(userContext.trim() || "");
-      setError("AI vision analysis was unavailable. Please select category and complete report details manually.");
+      setError("AI analysis is currently unavailable. You can continue by selecting the category manually.");
       setMode("review");
     } finally {
       setAnalyzingImage(false);
@@ -298,6 +332,7 @@ function CreateComplaintWizard() {
     setImagePreview(null);
     setEvidenceUrl(null);
     setUserContext("");
+    setIsAiAvailable(false);
     setAiConfidence(null);
     setAiReasoning(null);
     setAiPrimaryIssue(null);
@@ -747,35 +782,40 @@ function CreateComplaintWizard() {
               {/* AI Detection Summary */}
               <div className="md:col-span-7 space-y-3">
                 {/* AI Confidence Notice */}
-                {isAiConfident && aiConfidence !== null && aiConfidence >= 0.60 ? (
+                {isAiAvailable && isAiConfident && aiConfidence !== null && aiConfidence >= 0.60 ? (
                   <div className="p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold flex items-center gap-1.5">
                         <span>🤖</span> AI Suggestion
                       </span>
                       <span className="px-2 py-0.5 rounded bg-sky-200 text-sky-900 text-[10px] font-mono font-bold">
-                        {Math.round(aiConfidence * 100)}% Confidence
+                        AI analysis available ({Math.round(aiConfidence * 100)}%)
                       </span>
                     </div>
                     {aiReasoning && (
                       <p className="text-[11px] text-sky-800 leading-snug">
-                        <strong>We think this may be {aiPrimaryIssue || "a civic defect"}:</strong> {aiReasoning}
+                        <strong>Defect identified ({aiPrimaryIssue || "civic issue"}):</strong> {aiReasoning}
                       </p>
                     )}
                   </div>
                 ) : (
                   <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
-                      <span>⚠️</span> We&apos;re not sure what this issue is. Please review the details.
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-950">
+                      <span className="flex items-center gap-1.5">
+                        <span>⚠️</span> AI Analysis Status
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-amber-200 text-amber-950 text-[10px] font-mono font-bold">
+                        AI analysis unavailable
+                      </span>
                     </div>
                     <p className="text-[11px] text-amber-800">
-                      Please select a category, title, and description below so municipal crews can respond accurately.
+                      AI analysis is currently unavailable. You can continue by selecting the category manually.
                     </p>
                   </div>
                 )}
 
                 <div className="flex flex-wrap gap-2 items-center">
-                  <CategoryBadge category={category} />
+                  {category ? <CategoryBadge category={category} /> : <span className="text-xs text-rose-600 font-semibold">⚠️ Select Category Below</span>}
                   <PriorityBadge priority={priority} />
                 </div>
               </div>
@@ -917,16 +957,50 @@ function CreateComplaintWizard() {
 
           {/* Location & Map Picker */}
           <div className="gov-card p-5 bg-white border border-slate-200 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <h3 className="text-sm font-bold text-slate-900">Issue Location & Map Pin</h3>
-              <span className="text-xs text-slate-500 font-mono">
-                {latitude.toFixed(4)}, {longitude.toFixed(4)}
-              </span>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Issue Location & Map Pin</h3>
+                <p className="text-[11px] text-slate-500 font-mono">
+                  Coordinates: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={requestCurrentLocation}
+                disabled={isDetectingLocation}
+                className={`w-full sm:w-auto min-h-[44px] px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer border shadow-xs ${
+                  isDetectingLocation
+                    ? "bg-sky-100 text-sky-800 border-sky-300 cursor-wait"
+                    : gpsStatus === "granted"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                    : gpsStatus === "denied"
+                    ? "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100"
+                    : "bg-sky-600 text-white border-sky-700 hover:bg-sky-700"
+                }`}
+              >
+                <span>📍</span>
+                <span>
+                  {isDetectingLocation
+                    ? "Detecting location..."
+                    : gpsStatus === "granted"
+                    ? "Location detected (Tap to update)"
+                    : gpsStatus === "denied"
+                    ? "Retry Current Location"
+                    : "Use My Current Location"}
+                </span>
+              </button>
             </div>
 
-            {gpsStatus === "denied" && (
-              <div className="p-3 rounded bg-amber-50 border border-amber-200 text-amber-900 text-xs">
-                <strong>Notice:</strong> Device location permission unavailable. Please drag the marker on the map to set the exact issue location.
+            {locationMessage && (
+              <div
+                className={`p-3 rounded-lg border text-xs font-semibold animate-fade-in ${
+                  gpsStatus === "granted"
+                    ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                    : "bg-amber-50 text-amber-900 border-amber-200"
+                }`}
+              >
+                {gpsStatus === "granted" ? "✅ " : "⚠️ "} {locationMessage}
               </div>
             )}
 

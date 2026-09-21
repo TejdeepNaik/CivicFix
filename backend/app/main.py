@@ -21,12 +21,19 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Ensure uploads evidence directory exists
-upload_dir = os.path.join(os.getcwd(), "uploads", "evidence")
-os.makedirs(upload_dir, exist_ok=True)
+# Resolve UPLOAD_DIR once at startup.
+# - Local dev: settings.UPLOAD_DIR defaults to "uploads" (relative, next to cwd).
+# - Production (Railway): set UPLOAD_DIR=/app/uploads with a persistent Volume mounted there.
+UPLOAD_DIR = os.path.abspath(settings.UPLOAD_DIR)
+EVIDENCE_DIR = os.path.join(UPLOAD_DIR, "evidence")
 
-# Mount static uploads directory for serving complaint evidence photos
-app.mount("/static/uploads", StaticFiles(directory="uploads"), name="static_uploads")
+# Ensure the evidence subdirectory exists (idempotent on every startup).
+os.makedirs(EVIDENCE_DIR, exist_ok=True)
+
+# Mount static uploads directory for serving complaint evidence photos.
+# URL prefix /static/uploads → files on disk at UPLOAD_DIR.
+# e.g. /static/uploads/evidence/{uuid}.jpg → UPLOAD_DIR/evidence/{uuid}.jpg
+app.mount("/static/uploads", StaticFiles(directory=UPLOAD_DIR), name="static_uploads")
 
 # Configure CORS middleware for frontend communication
 app.add_middleware(

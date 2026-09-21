@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 
 // Fix Leaflet's default icon issue with Next.js/Webpack
@@ -16,6 +16,16 @@ interface MapPickerProps {
   latitude: number;
   longitude: number;
   onChange: (lat: number, lng: number) => void;
+}
+
+function RecenterMap({ latitude, longitude }: { latitude: number; longitude: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (latitude && longitude) {
+      map.setView([latitude, longitude], 15);
+    }
+  }, [latitude, longitude, map]);
+  return null;
 }
 
 function LocationMarker({ position, setPosition }: { position: L.LatLng | null; setPosition: (pos: L.LatLng) => void }) {
@@ -54,7 +64,7 @@ export default function MapPicker({ latitude, longitude, onChange }: MapPickerPr
     setIsReady(true);
   }, [position]);
 
-  // Update internal state if props change (e.g. from preset buttons)
+  // Update internal state if props change (e.g. from preset buttons or geolocation)
   useEffect(() => {
     if (latitude && longitude && (!position || position.lat !== latitude || position.lng !== longitude)) {
       setPosition(new L.LatLng(latitude, longitude));
@@ -64,7 +74,7 @@ export default function MapPicker({ latitude, longitude, onChange }: MapPickerPr
   const defaultCenter: L.LatLngTuple = latitude && longitude ? [latitude, longitude] : [12.9716, 77.5946];
 
   return (
-    <div className="h-64 w-full rounded-lg overflow-hidden border border-slate-700 shadow-inner" style={{ zIndex: 0 }}>
+    <div className="h-64 w-full rounded-lg overflow-hidden border border-slate-300 shadow-inner max-w-full" style={{ zIndex: 0 }}>
       <MapContainer
         center={defaultCenter}
         zoom={13}
@@ -75,6 +85,7 @@ export default function MapPicker({ latitude, longitude, onChange }: MapPickerPr
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <RecenterMap latitude={latitude} longitude={longitude} />
         <LocationMarker position={position} setPosition={setPosition} />
       </MapContainer>
     </div>

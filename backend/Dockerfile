@@ -21,7 +21,7 @@ COPY alembic/alembic.ini ./alembic.ini
 
 # Create non-root user and set permissions
 RUN addgroup --system civicfix && adduser --system --ingroup civicfix civicfix
-RUN chown -R civicfix:civicfix /app
+RUN mkdir -p /app/uploads/evidence && chown -R civicfix:civicfix /app
 USER civicfix
 
 # Expose default backend port

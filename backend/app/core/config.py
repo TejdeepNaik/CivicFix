@@ -55,6 +55,11 @@ if PYDANTIC_V2:
 
         REDIS_URL: str = "redis://localhost:6379/0"
 
+        # Upload directory for evidence photos.
+        # Local dev: relative path (./uploads) — works without any env var.
+        # Production (Railway): set UPLOAD_DIR=/app/uploads and mount a Volume there.
+        UPLOAD_DIR: str = "uploads"
+
         BACKEND_CORS_ORIGINS: Union[List[str], str] = [
             "http://localhost:3000",
             "http://127.0.0.1:3000",
@@ -87,6 +92,11 @@ else:
         ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
         REDIS_URL: str = "redis://localhost:6379/0"
+
+        # Upload directory for evidence photos.
+        # Local dev: relative path (./uploads) — works without any env var.
+        # Production (Railway): set UPLOAD_DIR=/app/uploads and mount a Volume there.
+        UPLOAD_DIR: str = "uploads"
 
         BACKEND_CORS_ORIGINS: List[str] = [
             "http://localhost:3000",
