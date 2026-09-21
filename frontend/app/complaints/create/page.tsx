@@ -84,8 +84,8 @@ function CreateComplaintWizard() {
   const [aiPrimaryIssue, setAiPrimaryIssue] = useState<string | null>(null);
 
   // Form Fields
-  const [category, setCategory] = useState<ComplaintCategoryEnum>(
-    (preselectedCategory as ComplaintCategoryEnum) || ComplaintCategoryEnum.POTHOLE
+  const [category, setCategory] = useState<ComplaintCategoryEnum | "">(
+    (preselectedCategory as ComplaintCategoryEnum) || ""
   );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -147,12 +147,14 @@ function CreateComplaintWizard() {
     if (addr) setAddress(addr);
   };
 
-  // Step 1: File selection -> Photo Preview
+  // Step 1: File selection -> Clear stale AI state & Photo Preview
   const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
+    const isImageMime = file.type.startsWith("image/");
+    const isImageExt = Boolean(file.name.match(/\.(heic|heif|jpg|jpeg|png|webp)$/i));
+    if (!isImageMime && !isImageExt) {
       setError("Invalid file type. Please select or take a photo image.");
       return;
     }
@@ -162,7 +164,19 @@ function CreateComplaintWizard() {
       return;
     }
 
+    // Clear all previous AI analysis state when selecting a new photo
     setError(null);
+    setEvidenceUrl(null);
+    setAiConfidence(null);
+    setAiReasoning(null);
+    setAiPrimaryIssue(null);
+    setTitle("");
+    setDescription("");
+    setCategory((preselectedCategory as ComplaintCategoryEnum) || "");
+    setPriority(ComplaintPriorityEnum.MEDIUM);
+    setIsAiConfident(true);
+    setShowEditFields(false);
+
     setImageFile(file);
 
     const reader = new FileReader();
@@ -171,7 +185,7 @@ function CreateComplaintWizard() {
     };
     reader.readAsDataURL(file);
 
-    // Transition to Photo Preview step (Do not submit immediately!)
+    // Transition to Photo Preview step
     setMode("preview");
   };
 
@@ -184,6 +198,12 @@ function CreateComplaintWizard() {
 
     setError(null);
     setAnalyzingImage(true);
+
+    // Reset previous AI outputs before new analysis request
+    setEvidenceUrl(null);
+    setAiConfidence(null);
+    setAiReasoning(null);
+    setAiPrimaryIssue(null);
 
     try {
       const analysis = await analyzeImageApi(
@@ -199,7 +219,9 @@ function CreateComplaintWizard() {
       setAiReasoning(analysis.reasoning || null);
       setAiPrimaryIssue(analysis.primary_issue || null);
 
-      if (conf >= 0.60 && analysis.is_civic_issue) {
+      const isAvailable = analysis.analysis_available !== false;
+
+      if (isAvailable && conf >= 0.60 && analysis.is_civic_issue) {
         setIsAiConfident(true);
 
         // Map Category
@@ -208,6 +230,9 @@ function CreateComplaintWizard() {
             (c) => c.toLowerCase() === analysis.suggested_category?.toLowerCase()
           );
           if (matchedCat) setCategory(matchedCat);
+          else setCategory(ComplaintCategoryEnum.OTHER);
+        } else {
+          setCategory((preselectedCategory as ComplaintCategoryEnum) || "");
         }
 
         // Map Priority / Severity
@@ -217,6 +242,9 @@ function CreateComplaintWizard() {
           else if (sev === "HIGH") setPriority(ComplaintPriorityEnum.HIGH);
           else if (sev === "MEDIUM") setPriority(ComplaintPriorityEnum.MEDIUM);
           else if (sev === "LOW") setPriority(ComplaintPriorityEnum.LOW);
+          else setPriority(ComplaintPriorityEnum.MEDIUM);
+        } else {
+          setPriority(ComplaintPriorityEnum.MEDIUM);
         }
 
         // Map Title & Description
@@ -229,23 +257,36 @@ function CreateComplaintWizard() {
         }
         setDescription(descText);
       } else {
+        // Vision model unavailable or low confidence — force manual review without fake pothole/medium classification
         setIsAiConfident(false);
         setShowEditFields(true);
-        setTitle(analysis.primary_issue || "Civic Infrastructure Issue");
-        setDescription(userContext.trim() || "");
+        setCategory((preselectedCategory as ComplaintCategoryEnum) || "");
+        setPriority(ComplaintPriorityEnum.MEDIUM);
+
+        if (!isAvailable) {
+          setError("AI vision analysis is currently unavailable. Please select the issue category and fill in details manually.");
+          setTitle(userContext.trim() || "Civic Infrastructure Issue");
+          setDescription(userContext.trim() || "");
+        } else {
+          setTitle(analysis.primary_issue || userContext.trim() || "Civic Infrastructure Issue");
+          setDescription(analysis.reasoning || userContext.trim() || "");
+        }
       }
 
       setMode("review");
-      if (title.trim() && description.trim()) {
-        runDuplicateCheck(title, description, category);
+      const currentCat = category || (preselectedCategory as ComplaintCategoryEnum) || "";
+      if (title.trim() && description.trim() && currentCat) {
+        runDuplicateCheck(title, description, currentCat);
       }
     } catch (err: any) {
       console.warn("Vision analysis failed, proceeding with manual details:", err);
       setIsAiConfident(false);
       setShowEditFields(true);
-      setTitle("Civic Infrastructure Issue");
+      setCategory((preselectedCategory as ComplaintCategoryEnum) || "");
+      setPriority(ComplaintPriorityEnum.MEDIUM);
+      setTitle(userContext.trim() || "Civic Infrastructure Issue");
       setDescription(userContext.trim() || "");
-      setError("AI analysis was unavailable. Please review and fill in the details manually.");
+      setError("AI vision analysis was unavailable. Please select category and complete report details manually.");
       setMode("review");
     } finally {
       setAnalyzingImage(false);
@@ -262,6 +303,10 @@ function CreateComplaintWizard() {
     setAiPrimaryIssue(null);
     setIsAiConfident(true);
     setShowEditFields(false);
+    setTitle("");
+    setDescription("");
+    setCategory((preselectedCategory as ComplaintCategoryEnum) || "");
+    setPriority(ComplaintPriorityEnum.MEDIUM);
     setError(null);
     setMode("camera");
     if (cameraInputRef.current) cameraInputRef.current.value = "";

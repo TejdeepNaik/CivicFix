@@ -39,11 +39,7 @@ const MapView = dynamic(() => import("../../../components/MapView"), {
 });
 
 export default function ComplaintDetailPage() {
-  return (
-    <ProtectedRoute>
-      <ComplaintDetailContent />
-    </ProtectedRoute>
-  );
+  return <ComplaintDetailContent />;
 }
 
 function ComplaintDetailContent() {

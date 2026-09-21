@@ -120,11 +120,14 @@ def test_image_embedding_differs_from_text_embedding():
 
 def test_image_upload_endpoint_valid_file(user_token):
     headers = {"Authorization": f"Bearer {user_token}"}
-    # Minimal valid PNG header bytes
-    file_content = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
-        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
-    )
+    # Generate a real 1x1 red pixel PNG using Pillow so image preprocessing succeeds
+    from PIL import Image as PILImage
+    img_buffer = io.BytesIO()
+    img = PILImage.new("RGB", (1, 1), color=(255, 0, 0))
+    img.save(img_buffer, format="PNG")
+    img_buffer.seek(0)
+    file_content = img_buffer.read()
+
     files = {"file": ("test_photo.png", io.BytesIO(file_content), "image/png")}
 
     response = client.post("/api/v1/complaints/upload-evidence", headers=headers, files=files)

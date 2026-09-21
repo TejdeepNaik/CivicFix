@@ -5,13 +5,19 @@ import uuid
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Query, Form, status, UploadFile, File
+import logging
+import io
+from PIL import Image, ImageOps
+import pillow_heif
+pillow_heif.register_heif_opener()
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Form, status, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from ..db.database import get_db
 from ..core.security import create_access_token
-from .deps import get_current_user
+from .deps import get_current_user, get_optional_current_user
 from ..models.user import User, RoleEnum
 from ..models.complaint import (
     Complaint,
@@ -26,6 +32,7 @@ from ..schemas.complaint import (
     ComplaintUpdate,
     ComplaintResponse,
     ComplaintListResponse,
+    ComplaintPublicSnapshotResponse,
     ComplaintResolveRequest,
     ComplaintVerifyRequest
 )
@@ -42,42 +49,158 @@ from ..services.notifications import (
     record_worker_assigned,
 )
 
+ai_logger = logging.getLogger("civicfix.ai_diagnostics")
+
 router = APIRouter()
 
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_MIME_TYPES = {
+    "image/jpeg", "image/jpg", "image/png", "image/webp",
+    "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence",
+    "image/pjpeg", "application/octet-stream"
+}
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+def log_safe_diagnostic_metadata(
+    request_id: str,
+    mime_type: str,
+    filename: str,
+    file_size: int,
+    dimensions: Optional[tuple],
+    reached_backend: bool,
+    ai_provider_status: str,
+    ai_provider_failure_reason: Optional[str] = None
+):
+    """Log ONLY safe non-sensitive diagnostic metadata. Never logs image data, API keys, or user details."""
+    ext = os.path.splitext(filename)[1].lower() if filename else "unknown"
+    ai_logger.info(
+        "AI_DIAGNOSTIC | request_id=%s | mime_type=%s | ext=%s | file_size_bytes=%d | dimensions=%s | reached_backend=%s | ai_provider_status=%s | failure_reason=%s",
+        request_id,
+        mime_type,
+        ext,
+        file_size,
+        f"{dimensions[0]}x{dimensions[1]}" if dimensions else "unknown",
+        reached_backend,
+        ai_provider_status,
+        ai_provider_failure_reason or "none"
+    )
+
+
+def process_and_normalize_image(file_bytes: bytes, filename: str, content_type: str) -> tuple[bytes, str, int, int]:
+    """
+    Normalizes uploaded images (JPEG, PNG, WebP, HEIC/HEIF from mobile devices) using Pillow:
+    - Transposes EXIF orientation so mobile camera captures are upright
+    - Converts color space to RGB
+    - Re-encodes image to standard JPEG bytes
+    Returns (jpeg_bytes, "image/jpeg", width, height).
+    """
+    try:
+        img = Image.open(io.BytesIO(file_bytes))
+        img = ImageOps.exif_transpose(img)
+        width, height = img.size
+
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        elif img.mode == "L":
+            img = img.convert("RGB")
+
+        out_buffer = io.BytesIO()
+        img.save(out_buffer, format="JPEG", quality=90)
+        norm_bytes = out_buffer.getvalue()
+        return norm_bytes, "image/jpeg", width, height
+    except Exception as e:
+        ai_logger.warning("Image processing failed for %s: %s", filename, e)
+        raise ValueError(f"Could not decode image file: {e}")
 
 
 @router.post("/upload-evidence", summary="Upload evidence photo")
 def upload_evidence(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
     """Upload evidence photo with server-side file size and MIME type validation."""
-    if file.content_type not in ALLOWED_MIME_TYPES:
+    request_id = request.headers.get("x-request-id") or request.headers.get("x-correlation-id") or f"req_{uuid.uuid4().hex[:10]}"
+    ext = os.path.splitext(file.filename or "")[1].lower()
+
+    if file.content_type not in ALLOWED_MIME_TYPES and ext not in ALLOWED_EXTENSIONS:
+        log_safe_diagnostic_metadata(
+            request_id=request_id,
+            mime_type=file.content_type or "unknown",
+            filename=file.filename or "",
+            file_size=0,
+            dimensions=None,
+            reached_backend=True,
+            ai_provider_status="REJECTED_MIME",
+            ai_provider_failure_reason="Invalid file type"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file type. Only JPEG, PNG, and WebP images are allowed."
+            detail="Invalid file type. JPEG, PNG, WebP, and HEIC/HEIF images are allowed."
         )
 
     file_bytes = file.file.read()
-    if len(file_bytes) > MAX_FILE_SIZE:
+    file_size = len(file_bytes)
+    if file_size > MAX_FILE_SIZE:
+        log_safe_diagnostic_metadata(
+            request_id=request_id,
+            mime_type=file.content_type or "unknown",
+            filename=file.filename or "",
+            file_size=file_size,
+            dimensions=None,
+            reached_backend=True,
+            ai_provider_status="REJECTED_SIZE",
+            ai_provider_failure_reason="File size exceeds 10MB limit"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File size exceeds 10MB limit."
         )
 
-    ext = os.path.splitext(file.filename)[1].lower() or ".jpg"
-    filename = f"{uuid.uuid4()}{ext}"
+    try:
+        norm_bytes, norm_mime, width, height = process_and_normalize_image(
+            file_bytes=file_bytes,
+            filename=file.filename or "evidence.jpg",
+            content_type=file.content_type or "image/jpeg"
+        )
+    except ValueError as err:
+        log_safe_diagnostic_metadata(
+            request_id=request_id,
+            mime_type=file.content_type or "unknown",
+            filename=file.filename or "",
+            file_size=file_size,
+            dimensions=None,
+            reached_backend=True,
+            ai_provider_status="CORRUPT_IMAGE",
+            ai_provider_failure_reason=str(err)
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid or corrupted image: {err}"
+        )
+
+    filename = f"{uuid.uuid4()}.jpg"
     upload_dir = os.path.join(os.getcwd(), "uploads", "evidence")
     os.makedirs(upload_dir, exist_ok=True)
     file_path = os.path.join(upload_dir, filename)
 
     with open(file_path, "wb") as f:
-        f.write(file_bytes)
+        f.write(norm_bytes)
+
+    log_safe_diagnostic_metadata(
+        request_id=request_id,
+        mime_type=file.content_type or "unknown",
+        filename=file.filename or "",
+        file_size=file_size,
+        dimensions=(width, height),
+        reached_backend=True,
+        ai_provider_status="UPLOAD_SUCCESS",
+        ai_provider_failure_reason=None
+    )
 
     evidence_url = f"/static/uploads/evidence/{filename}"
-    return {"evidence_url": evidence_url}
+    return {"evidence_url": evidence_url, "request_id": request_id}
 
 
 class PreSubmissionDuplicateCheckRequest(BaseModel):
@@ -91,6 +214,7 @@ class PreSubmissionDuplicateCheckRequest(BaseModel):
 
 @router.post("/analyze-image", summary="Upload evidence and perform pre-submission vision AI analysis")
 def analyze_image(
+    request: Request,
     file: UploadFile = File(...),
     latitude: Optional[float] = Query(None),
     longitude: Optional[float] = Query(None),
@@ -98,41 +222,114 @@ def analyze_image(
     current_user: User = Depends(get_current_user)
 ):
     """Upload evidence photo, perform AI vision analysis for civic issues, and return evidence URL with structured detection."""
-    if file.content_type not in ALLOWED_MIME_TYPES:
+    request_id = request.headers.get("x-request-id") or request.headers.get("x-correlation-id") or f"req_{uuid.uuid4().hex[:10]}"
+    ext = os.path.splitext(file.filename or "")[1].lower()
+
+    if file.content_type not in ALLOWED_MIME_TYPES and ext not in ALLOWED_EXTENSIONS:
+        log_safe_diagnostic_metadata(
+            request_id=request_id,
+            mime_type=file.content_type or "unknown",
+            filename=file.filename or "",
+            file_size=0,
+            dimensions=None,
+            reached_backend=True,
+            ai_provider_status="REJECTED_MIME",
+            ai_provider_failure_reason="Invalid file type"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file type. Only JPEG, PNG, and WebP images are allowed."
+            detail="Invalid file type. JPEG, PNG, WebP, and HEIC/HEIF images are allowed."
         )
 
     file_bytes = file.file.read()
-    if len(file_bytes) > MAX_FILE_SIZE:
+    file_size = len(file_bytes)
+    if file_size > MAX_FILE_SIZE:
+        log_safe_diagnostic_metadata(
+            request_id=request_id,
+            mime_type=file.content_type or "unknown",
+            filename=file.filename or "",
+            file_size=file_size,
+            dimensions=None,
+            reached_backend=True,
+            ai_provider_status="REJECTED_SIZE",
+            ai_provider_failure_reason="File size exceeds 10MB limit"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File size exceeds 10MB limit."
         )
 
-    ext = os.path.splitext(file.filename)[1].lower() or ".jpg"
-    filename = f"{uuid.uuid4()}{ext}"
+    dimensions = None
+    try:
+        norm_bytes, norm_mime, width, height = process_and_normalize_image(
+            file_bytes=file_bytes,
+            filename=file.filename or "evidence.jpg",
+            content_type=file.content_type or "image/jpeg"
+        )
+        dimensions = (width, height)
+    except ValueError as err:
+        log_safe_diagnostic_metadata(
+            request_id=request_id,
+            mime_type=file.content_type or "unknown",
+            filename=file.filename or "",
+            file_size=file_size,
+            dimensions=None,
+            reached_backend=True,
+            ai_provider_status="CORRUPT_IMAGE",
+            ai_provider_failure_reason=str(err)
+        )
+        # Return graceful AI unavailable response instead of unhandled crash
+        ai_service = get_ai_service()
+        analysis = ai_service.analyze_image_for_civic_issue(
+            image_bytes=file_bytes,
+            content_type=file.content_type or "image/jpeg",
+            latitude=latitude,
+            longitude=longitude,
+            user_context=user_context
+        )
+        analysis["request_id"] = request_id
+        analysis["evidence_url"] = None
+        analysis["analysis_available"] = False
+        analysis["reasoning"] = f"Image preprocessing failed: {err}"
+        return analysis
+
+    filename = f"{uuid.uuid4()}.jpg"
     upload_dir = os.path.join(os.getcwd(), "uploads", "evidence")
     os.makedirs(upload_dir, exist_ok=True)
     file_path = os.path.join(upload_dir, filename)
 
     with open(file_path, "wb") as f:
-        f.write(file_bytes)
+        f.write(norm_bytes)
 
     evidence_url = f"/static/uploads/evidence/{filename}"
 
     # Perform AI vision analysis
     ai_service = get_ai_service()
     analysis = ai_service.analyze_image_for_civic_issue(
-        image_bytes=file_bytes,
-        content_type=file.content_type,
+        image_bytes=norm_bytes,
+        content_type=norm_mime,
         latitude=latitude,
         longitude=longitude,
         user_context=user_context
     )
 
     analysis["evidence_url"] = evidence_url
+    analysis["request_id"] = request_id
+
+    # Safe log AI status
+    ai_status = "SUCCESS" if analysis.get("analysis_available") else "UNAVAILABLE"
+    failure_reason = None if analysis.get("analysis_available") else analysis.get("reasoning")
+    log_safe_diagnostic_metadata(
+        request_id=request_id,
+        mime_type=file.content_type or "unknown",
+        filename=file.filename or "",
+        file_size=file_size,
+        dimensions=dimensions,
+        reached_backend=True,
+        ai_provider_status=ai_status,
+        ai_provider_failure_reason=failure_reason
+    )
+
     return analysis
 
 
@@ -193,11 +390,30 @@ def create_complaint(
     return new_complaint
 
 
+@router.get("/public/snapshots", response_model=List[ComplaintPublicSnapshotResponse], summary="Get public complaint snapshots")
+def get_public_snapshots(
+    limit: int = Query(10, ge=1, le=10, description="Maximum number of snapshots to return (default 10)"),
+    db: Session = Depends(get_db)
+) -> List[ComplaintPublicSnapshotResponse]:
+    """
+    Retrieve latest public-safe complaint snapshots.
+    Ordered by creation date descending (newest first).
+    No authentication required.
+    """
+    snapshots = (
+        db.query(Complaint)
+        .order_by(Complaint.created_at.desc(), Complaint.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return snapshots
+
+
 @router.get("/{complaint_id}", response_model=ComplaintResponse, summary="Get complaint by ID")
 def get_complaint(
     complaint_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ) -> ComplaintResponse:
     """Retrieve details of a specific complaint."""
     complaint = db.query(Complaint).filter(Complaint.id == str(complaint_id)).first()
@@ -207,6 +423,7 @@ def get_complaint(
             detail="Complaint not found"
         )
     return complaint
+
 
 
 @router.get("", response_model=ComplaintListResponse, summary="List complaints with filters")

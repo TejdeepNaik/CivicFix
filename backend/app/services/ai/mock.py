@@ -118,7 +118,7 @@ class MockAIService(BaseAIService):
             "primary_issue": None,
             "is_civic_issue": False,
             "confidence": 0.0,
-            "severity": "LOW",
+            "severity": None,
             "suggested_category": None,
             "suggested_department": None,
             "detections": [],

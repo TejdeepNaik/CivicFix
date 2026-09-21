@@ -1,6 +1,6 @@
 """Reusable FastAPI dependencies for database sessions, authentication, and RBAC."""
 
-from typing import List, Callable
+from typing import List, Callable, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
@@ -14,6 +14,28 @@ from ..models.role import RoleEnum
 from ..schemas.auth import TokenPayload
 
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
+
+
+def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Retrieve current authenticated user if token provided, else return None."""
+    if not credentials:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+        user_id: str = payload.get("sub")
+        if not user_id:
+            return None
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.is_active:
+            return user
+    except Exception:
+        pass
+    return None
+
 
 
 def get_current_user(

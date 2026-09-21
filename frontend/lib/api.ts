@@ -10,6 +10,7 @@ import {
   AdminDashboardResponse,
   PaginatedList,
   ComplaintAnalysisResponse,
+  ComplaintPublicSnapshot,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -164,7 +165,10 @@ export async function analyzeImageApi(
   if (longitude !== undefined && longitude !== null) query.append("longitude", String(longitude));
   const queryString = query.toString();
 
-  const headers: Record<string, string> = {};
+  const reqId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const headers: Record<string, string> = {
+    "X-Request-ID": reqId,
+  };
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -232,6 +236,10 @@ export async function listComplaintsApi(params: Record<string, any> = {}): Promi
   });
   const queryString = query.toString();
   return request(`/complaints${queryString ? `?${queryString}` : ""}`);
+}
+
+export async function getPublicSnapshotsApi(limit: number = 10): Promise<ComplaintPublicSnapshot[]> {
+  return request(`/complaints/public/snapshots?limit=${limit}`);
 }
 
 export async function updateComplaintApi(id: string, payload: Record<string, any>): Promise<Complaint> {

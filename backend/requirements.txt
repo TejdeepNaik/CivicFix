@@ -12,3 +12,5 @@ email-validator
 pgvector
 python-multipart
 httpx
+pillow
+pillow-heif

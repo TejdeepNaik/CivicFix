@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { ComplaintCategoryEnum } from "../lib/types";
+import SnapshotsCarousel from "../components/SnapshotsCarousel";
 
 const ISSUE_CATEGORIES = [
   {
@@ -227,6 +228,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── REALTIME COMPLAINT SNAPSHOTS CAROUSEL ── */}
+      <SnapshotsCarousel />
 
       {/* ── SECTION 1: Municipal Services Categories ── */}
       <section className="space-y-4">

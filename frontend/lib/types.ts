@@ -108,6 +108,21 @@ export interface Complaint {
   updated_at?: string | null;
 }
 
+export interface ComplaintPublicSnapshot {
+  id: string;
+  title: string;
+  description: string;
+  category: ComplaintCategoryEnum;
+  status: ComplaintStatusEnum;
+  priority: ComplaintPriorityEnum;
+  latitude: number;
+  longitude: number;
+  address?: string | null;
+  evidence_url?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
 export interface DuplicateMatch {
   complaint_id: string;
   title: string;

@@ -84,3 +84,20 @@ class ComplaintListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class ComplaintPublicSnapshotResponse(BaseModel):
+    id: UUID
+    title: str
+    description: str
+    category: ComplaintCategoryEnum
+    status: ComplaintStatusEnum
+    priority: ComplaintPriorityEnum
+    latitude: float
+    longitude: float
+    address: Optional[str] = None
+    evidence_url: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
