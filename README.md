@@ -2,14 +2,14 @@
 
 CivicFix is a full-stack web application designed to help communities report and manage civic issues. The project includes a modern frontend built with Next.js, a robust backend powered by FastAPI, and uses PostgreSQL and Redis for data and caching.
 
-## 🚀 Features
+##  Features
 
 - **User Authentication**: Secure JWT-based authentication.
 - **Issue Reporting**: Users can report and track civic issues in their community.
 - **AI Integration**: Optional OpenAI integration to assist with issue categorization or summarization (with a built-in mock provider for local development without an API key).
 - **Containerized Environment**: Fully containerized using Docker and Docker Compose for seamless local development and deployment.
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Frontend
 - **Framework**: [Next.js](https://nextjs.org/) (React)
@@ -25,13 +25,13 @@ CivicFix is a full-stack web application designed to help communities report and
 - **Cache / Task Queue**: Redis 7
 - **Containerization**: Docker Compose
 
-## 📋 Prerequisites
+##  Prerequisites
 
 Make sure you have the following installed on your machine:
 - [Docker](https://docs.docker.com/get-docker/)
 - [Docker Compose](https://docs.docker.com/compose/install/)
 
-## 🏁 Getting Started
+##  Getting Started
 
 Follow these steps to run CivicFix locally using Docker Compose.
 
@@ -88,7 +88,7 @@ CivicFix/
 └── .env.example        # Template for environment variables
 ```
 
-## 🛑 Stopping the Application
+##  Stopping the Application
 
 To stop the running containers, execute:
 
